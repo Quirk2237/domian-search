@@ -1,29 +1,10 @@
-import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server"
 import { NextResponse } from "next/server"
 import type { NextRequest } from "next/server"
 
-const isProtectedRoute = createRouteMatcher(["/dashboard(.*)"])
-
-// Wrap the middleware to check MVP mode at runtime
+// MVP-only middleware without Clerk imports
 export default function middleware(req: NextRequest) {
-  // Check MVP mode at runtime, not build time
-  const isMvpMode = process.env.NEXT_PUBLIC_MVP_MODE === "true"
-  
-  if (isMvpMode) {
-    // Simple pass-through for MVP mode
-    return NextResponse.next()
-  }
-  
-  // Use Clerk middleware when not in MVP mode
-  return clerkMiddleware(async (auth, req) => {
-    const { userId, redirectToSignIn } = await auth()
-
-    if (!userId && isProtectedRoute(req)) {
-      return redirectToSignIn()
-    }
-
-    return NextResponse.next()
-  })(req, {} as any)
+  // In MVP mode, just pass through all requests
+  return NextResponse.next()
 }
 
 export const config = {
