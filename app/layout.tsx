@@ -1,7 +1,7 @@
 import { CheckoutRedirect } from "@/components/payments/checkout-redirect"
 import { TooltipProvider } from "@/components/ui/tooltip"
 import { TailwindIndicator } from "@/components/utility/tailwind-indicator"
-import { ClerkProvider } from "@clerk/nextjs"
+import { AuthProvider } from "@/components/providers/auth-provider"
 import type { Metadata } from "next"
 import { ThemeProvider } from "next-themes"
 import localFont from "next/font/local"
@@ -71,7 +71,7 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <ClerkProvider>
+    <AuthProvider>
       <html lang="en" suppressHydrationWarning>
         <body
           className={`${geistMono.variable} antialiased`}
@@ -87,6 +87,6 @@ export default function RootLayout({
           </ThemeProvider>
         </body>
       </html>
-    </ClerkProvider>
+    </AuthProvider>
   )
 }

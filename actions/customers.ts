@@ -3,6 +3,7 @@
 import { db } from "@/db"
 import { customers, type SelectCustomer } from "@/db/schema/customers"
 import { currentUser } from "@clerk/nextjs/server"
+import { mvpCurrentUser } from "@/lib/auth-mvp"
 import { eq } from "drizzle-orm"
 
 export async function getCustomerByUserId(
@@ -20,8 +21,9 @@ export async function getBillingDataByUserId(userId: string): Promise<{
   clerkEmail: string | null
   stripeEmail: string | null
 }> {
-  // Get Clerk user data
-  const user = await currentUser()
+  // Get user data - use MVP mode if enabled
+  const isMvpMode = process.env.NEXT_PUBLIC_MVP_MODE === "true"
+  const user = isMvpMode ? await mvpCurrentUser() : await currentUser()
 
   // Get profile to fetch Stripe customer ID
   const customer = await db.query.customers.findFirst({
