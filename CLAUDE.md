@@ -30,6 +30,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ### Shadcn UI Components
 - `npx shadcn@latest add [component-name]` - Install new Shadcn UI components
+- **When to use**: Use the MCP shadcn tools to preview component source code and demos before installing. This helps verify the component meets requirements and understand its API/props before adding to the project.
 
 ## Architecture
 

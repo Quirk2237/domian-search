@@ -1,9 +1,4 @@
-import { RedirectToast } from "@/components/payments/redirect-toast"
-import { Footer } from "./_components/footer"
-import { HeaderWrapper } from "./_components/header-wrapper"
-import { ScrollIndicator } from "./_components/scroll-indicator"
-import { SiteBanner } from "./_components/site-banner"
-import { StickyCTA } from "./_components/sticky-cta"
+import { SimpleHeader } from "./_components/simple-header"
 
 export default async function MarketingLayout({
   children
@@ -12,13 +7,8 @@ export default async function MarketingLayout({
 }) {
   return (
     <>
-      <SiteBanner />
-      <HeaderWrapper />
+      <SimpleHeader />
       {children}
-      <Footer />
-      <StickyCTA />
-      <ScrollIndicator />
-      <RedirectToast />
     </>
   )
 }

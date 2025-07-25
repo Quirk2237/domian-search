@@ -4,18 +4,60 @@ import { TailwindIndicator } from "@/components/utility/tailwind-indicator"
 import { ClerkProvider } from "@clerk/nextjs"
 import type { Metadata } from "next"
 import { ThemeProvider } from "next-themes"
-import { Geist, Geist_Mono } from "next/font/google"
+import localFont from "next/font/local"
 import { Toaster } from "sonner"
 import "./globals.css"
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"]
-})
-
-const geistMono = Geist_Mono({
+const geistMono = localFont({
+  src: [
+    {
+      path: "../public/fonts/GeistMono-Thin.woff2",
+      weight: "100",
+      style: "normal"
+    },
+    {
+      path: "../public/fonts/GeistMono-ExtraLight.woff2",
+      weight: "200",
+      style: "normal"
+    },
+    {
+      path: "../public/fonts/GeistMono-Light.woff2",
+      weight: "300",
+      style: "normal"
+    },
+    {
+      path: "../public/fonts/GeistMono-Regular.woff2",
+      weight: "400",
+      style: "normal"
+    },
+    {
+      path: "../public/fonts/GeistMono-Medium.woff2",
+      weight: "500",
+      style: "normal"
+    },
+    {
+      path: "../public/fonts/GeistMono-SemiBold.woff2",
+      weight: "600",
+      style: "normal"
+    },
+    {
+      path: "../public/fonts/GeistMono-Bold.woff2",
+      weight: "700",
+      style: "normal"
+    },
+    {
+      path: "../public/fonts/GeistMono-ExtraBold.woff2",
+      weight: "800",
+      style: "normal"
+    },
+    {
+      path: "../public/fonts/GeistMono-Black.woff2",
+      weight: "900",
+      style: "normal"
+    }
+  ],
   variable: "--font-geist-mono",
-  subsets: ["latin"]
+  display: "swap"
 })
 
 export const metadata: Metadata = {
@@ -32,7 +74,7 @@ export default function RootLayout({
     <ClerkProvider>
       <html lang="en" suppressHydrationWarning>
         <body
-          className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+          className={`${geistMono.variable} antialiased`}
         >
           <ThemeProvider attribute="class" defaultTheme="light" enableSystem>
             <TooltipProvider>
