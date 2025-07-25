@@ -4,26 +4,27 @@ import type { NextRequest } from "next/server"
 
 const isProtectedRoute = createRouteMatcher(["/dashboard(.*)"])
 
-// Simple middleware for MVP mode
-function mvpMiddleware(req: NextRequest) {
-  return NextResponse.next()
+// Wrap the middleware to check MVP mode at runtime
+export default function middleware(req: NextRequest) {
+  // Check MVP mode at runtime, not build time
+  const isMvpMode = process.env.NEXT_PUBLIC_MVP_MODE === "true"
+  
+  if (isMvpMode) {
+    // Simple pass-through for MVP mode
+    return NextResponse.next()
+  }
+  
+  // Use Clerk middleware when not in MVP mode
+  return clerkMiddleware(async (auth, req) => {
+    const { userId, redirectToSignIn } = await auth()
+
+    if (!userId && isProtectedRoute(req)) {
+      return redirectToSignIn()
+    }
+
+    return NextResponse.next()
+  })(req, {} as any)
 }
-
-// Check if we're in MVP mode
-const isMvpMode = process.env.NEXT_PUBLIC_MVP_MODE === "true"
-
-// Use MVP middleware if in MVP mode, otherwise use Clerk
-export default isMvpMode 
-  ? mvpMiddleware
-  : clerkMiddleware(async (auth, req) => {
-      const { userId, redirectToSignIn } = await auth()
-
-      if (!userId && isProtectedRoute(req)) {
-        return redirectToSignIn()
-      }
-
-      return NextResponse.next()
-    })
 
 export const config = {
   matcher: [
