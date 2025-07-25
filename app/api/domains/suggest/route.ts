@@ -434,7 +434,7 @@ Rules:
       console.error('Response content:', responseContent)
       return NextResponse.json(
         { error: 'Failed to parse domain suggestions from AI response' },
-pn        { status: 500 }
+        { status: 500 }
       )
     }
   } catch (error) {
