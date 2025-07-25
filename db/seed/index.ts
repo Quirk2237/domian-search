@@ -8,6 +8,11 @@ import { customersData } from "./data/customers"
 async function seed() {
   console.warn("Seeding database...")
 
+  if (!db) {
+    console.warn("Database not available in MVP mode - skipping seed")
+    return
+  }
+
   // Reset all tables in reverse order of dependencies
   console.warn("Resetting tables...")
   await db.execute("TRUNCATE TABLE customers CASCADE")

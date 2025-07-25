@@ -6,9 +6,24 @@ import { currentUser } from "@clerk/nextjs/server"
 import { mvpCurrentUser } from "@/lib/auth-mvp"
 import { eq } from "drizzle-orm"
 
+const isMvpMode = process.env.NEXT_PUBLIC_MVP_MODE === "true"
+
 export async function getCustomerByUserId(
   userId: string
 ): Promise<SelectCustomer | null> {
+  if (!db || isMvpMode) {
+    // Return mock customer data in MVP mode
+    return {
+      id: "mvp-customer-id",
+      userId,
+      membership: "free",
+      stripeCustomerId: null,
+      stripeSubscriptionId: null,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    }
+  }
+
   const customer = await db.query.customers.findFirst({
     where: eq(customers.userId, userId)
   })
@@ -22,8 +37,24 @@ export async function getBillingDataByUserId(userId: string): Promise<{
   stripeEmail: string | null
 }> {
   // Get user data - use MVP mode if enabled
-  const isMvpMode = process.env.NEXT_PUBLIC_MVP_MODE === "true"
   const user = isMvpMode ? await mvpCurrentUser() : await currentUser()
+
+  if (!db || isMvpMode) {
+    // Return mock data in MVP mode
+    return {
+      customer: {
+        id: "mvp-customer-id",
+        userId,
+        membership: "free",
+        stripeCustomerId: null,
+        stripeSubscriptionId: null,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      },
+      clerkEmail: user?.emailAddresses[0]?.emailAddress || null,
+      stripeEmail: null
+    }
+  }
 
   // Get profile to fetch Stripe customer ID
   const customer = await db.query.customers.findFirst({
@@ -45,6 +76,22 @@ export async function getBillingDataByUserId(userId: string): Promise<{
 export async function createCustomer(
   userId: string
 ): Promise<{ isSuccess: boolean; data?: SelectCustomer }> {
+  if (!db || isMvpMode) {
+    // Return mock success in MVP mode
+    return {
+      isSuccess: true,
+      data: {
+        id: "mvp-customer-id",
+        userId,
+        membership: "free",
+        stripeCustomerId: null,
+        stripeSubscriptionId: null,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      }
+    }
+  }
+
   try {
     const [newCustomer] = await db
       .insert(customers)
@@ -69,6 +116,23 @@ export async function updateCustomerByUserId(
   userId: string,
   updates: Partial<SelectCustomer>
 ): Promise<{ isSuccess: boolean; data?: SelectCustomer }> {
+  if (!db || isMvpMode) {
+    // Return mock success in MVP mode
+    return {
+      isSuccess: true,
+      data: {
+        id: "mvp-customer-id",
+        userId,
+        membership: "free",
+        stripeCustomerId: null,
+        stripeSubscriptionId: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        ...updates
+      }
+    }
+  }
+
   try {
     const [updatedCustomer] = await db
       .update(customers)
@@ -91,6 +155,23 @@ export async function updateCustomerByStripeCustomerId(
   stripeCustomerId: string,
   updates: Partial<SelectCustomer>
 ): Promise<{ isSuccess: boolean; data?: SelectCustomer }> {
+  if (!db || isMvpMode) {
+    // Return mock success in MVP mode
+    return {
+      isSuccess: true,
+      data: {
+        id: "mvp-customer-id",
+        userId: "mvp-user-id",
+        membership: "free",
+        stripeCustomerId: stripeCustomerId,
+        stripeSubscriptionId: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        ...updates
+      }
+    }
+  }
+
   try {
     const [updatedCustomer] = await db
       .update(customers)
