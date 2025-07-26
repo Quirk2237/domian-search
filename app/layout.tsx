@@ -16,7 +16,7 @@ const geistMono = localFont({
       style: "normal"
     },
     {
-      path: "../public/fonts/GeistMono-ExtraLight.woff2",
+      path: "../public/fonts/GeistMono-Light.woff2",
       weight: "200",
       style: "normal"
     },
@@ -46,7 +46,7 @@ const geistMono = localFont({
       style: "normal"
     },
     {
-      path: "../public/fonts/GeistMono-ExtraBold.woff2",
+      path: "../public/fonts/GeistMono-Bold.woff2",
       weight: "800",
       style: "normal"
     },
