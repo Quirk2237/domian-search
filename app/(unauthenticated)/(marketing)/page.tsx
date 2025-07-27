@@ -27,7 +27,7 @@ export default function MarketingPage() {
   // Unified animation configuration
   const animationConfig = {
     duration: 0.4,
-    ease: "easeInOut"
+    ease: "easeInOut" as const
   }
   return (
     <>
@@ -47,12 +47,11 @@ export default function MarketingPage() {
             ease: "easeInOut"
           }}
         >
-          <motion.div 
+          <div 
             className={cn(
-              "container mx-auto px-4 w-full",
+              "container mx-auto px-4 w-full transition-all duration-400",
               hasResults ? "py-8 sm:py-12 lg:py-16" : ""
             )}
-            transition={animationConfig}
           >
         <motion.div 
           className="text-center mb-12"
@@ -111,7 +110,7 @@ export default function MarketingPage() {
             </motion.div>
           )}
         </AnimatePresence>
-          </motion.div>
+          </div>
         </motion.main>
       </AnimatePresence>
     </>
