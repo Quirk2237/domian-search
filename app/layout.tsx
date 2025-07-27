@@ -62,13 +62,14 @@ const geistMono = localFont({
 
 export const metadata: Metadata = {
   title: "Mckay's App Template",
-  description: "The easiest way to start your next project.",
-  viewport: {
-    width: 'device-width',
-    initialScale: 1,
-    maximumScale: 1,
-    userScalable: false,
-  },
+  description: "The easiest way to start your next project."
+}
+
+export const viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
 }
 
 export default function RootLayout({

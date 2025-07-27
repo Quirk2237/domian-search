@@ -2,20 +2,5 @@
   "buildCommand": "npm run build",
   "outputDirectory": ".next",
   "installCommand": "npm install",
-  "framework": "nextjs",
-  "env": {
-    "NEXT_PUBLIC_MVP_MODE": "true",
-    "NEXT_PUBLIC_STRIPE_PAYMENT_LINK_YEARLY": "https://buy.stripe.com/test_placeholder_yearly",
-    "NEXT_PUBLIC_STRIPE_PAYMENT_LINK_MONTHLY": "https://buy.stripe.com/test_placeholder_monthly",
-    "NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY": "pk_test_dummy",
-    "NEXT_PUBLIC_CLERK_SIGN_IN_URL": "/login",
-    "NEXT_PUBLIC_CLERK_SIGN_UP_URL": "/signup",
-    "DATABASE_URL": "postgresql://placeholder:placeholder@placeholder:5432/placeholder",
-    "CLERK_SECRET_KEY": "sk_test_dummy",
-    "STRIPE_SECRET_KEY": "sk_test_dummy",
-    "STRIPE_WEBHOOK_SECRET": "whsec_dummy",
-    "DOMAINR_RAPIDAPI_KEY": "dummy_key",
-    "GROQ_API_KEY": "dummy_key",
-    "RATE_LIMIT_PER_MINUTE": "100"
-  }
+  "framework": "nextjs"
 }
