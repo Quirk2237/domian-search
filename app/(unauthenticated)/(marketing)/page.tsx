@@ -106,7 +106,7 @@ export default function MarketingPage() {
               exit={{ opacity: 0, y: 10 }}
               transition={animationConfig}
             >
-              <p>Enter a word or describe your idea to get started</p>
+              <p>Enter a word or describe your idea to get started.</p>
             </motion.div>
           )}
         </AnimatePresence>

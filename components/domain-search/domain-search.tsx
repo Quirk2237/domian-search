@@ -222,8 +222,8 @@ export function DomainSearch({ className, onQueryChange, onResultsChange }: Doma
             }}
             onScroll={handleScroll}
             className={cn(
-              "pl-10 pr-10 min-h-[48px] sm:min-h-[56px] max-h-[300px] text-base sm:text-lg rounded-xl shadow-lg border-input focus:border-primary focus:ring-2 focus:ring-primary/20 resize-none overflow-y-auto transition-all duration-300",
-              isSingleLine ? "py-3 sm:py-4" : "py-2"
+              "pl-10 pr-10 min-h-[40px] sm:min-h-[56px] max-h-[300px] text-sm sm:text-base lg:text-lg rounded-xl shadow-lg border-input focus:border-primary focus:ring-2 focus:ring-primary/20 resize-none overflow-y-auto transition-all duration-300",
+              isSingleLine ? "py-2 sm:py-3 lg:py-4" : "py-1 sm:py-2"
             )}
             autoFocus
             autoComplete="off"
