@@ -12,6 +12,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 
 interface DomainSearchProps {
   className?: string
+  onQueryChange?: (query: string) => void
 }
 
 interface DomainResult {
@@ -27,7 +28,7 @@ interface SuggestionResult {
   reason?: string
 }
 
-export function DomainSearch({ className }: DomainSearchProps) {
+export function DomainSearch({ className, onQueryChange }: DomainSearchProps) {
   const [query, setQuery] = useState('')
   const [searchMode, setSearchMode] = useState<'domain' | 'suggestion'>('domain')
   const [isLoading, setIsLoading] = useState(false)
@@ -204,9 +205,13 @@ export function DomainSearch({ className }: DomainSearchProps) {
                 const hasScroll = textareaRef.current.scrollHeight > textareaRef.current.clientHeight
                 setHasOverflow(hasScroll)
               }
+              
+              // Call the onQueryChange callback if provided
+              if (onQueryChange) {
+                onQueryChange(newValue)
+              }
             }}
             onScroll={handleScroll}
-            placeholder="Enter a word or describe your idea"
             className={cn(
               "pl-10 pr-10 min-h-[56px] max-h-[300px] text-base sm:text-lg rounded-xl shadow-lg border-input focus:border-primary focus:ring-2 focus:ring-primary/20 resize-none overflow-y-auto transition-all duration-300",
               isSingleLine ? "py-4" : "py-2"
