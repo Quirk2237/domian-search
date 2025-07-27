@@ -353,9 +353,10 @@ Rules:
       temperature: 0.3,
       max_tokens: 2000
     })
-    } catch (groqError: any) {
-      console.error('GROQ API error:', groqError.status, groqError.message)
-      if (groqError.status === 401) {
+    } catch (groqError) {
+      const error = groqError as { status?: number; message?: string }
+      console.error('GROQ API error:', error.status, error.message)
+      if (error.status === 401) {
         return NextResponse.json(
           { error: 'Invalid GROQ API key. Please check your environment configuration.' },
           { status: 500 }
@@ -457,13 +458,14 @@ Rules:
               extension: suggestion.extension || '.com',
               reason: suggestion.reason
             })
-          } catch (error: any) {
+          } catch (error) {
             // If domain check fails, don't include it in results
-            console.log(`✗ Domain ${cleanDomain} check failed:`, error.message)
+            const err = error as Error
+            console.log(`✗ Domain ${cleanDomain} check failed:`, err.message)
             
             // If it's an API key error, throw it to stop processing
-            if (error.message === 'Invalid Domainr API key') {
-              throw error
+            if (err.message === 'Invalid Domainr API key') {
+              throw err
             }
           }
         }
