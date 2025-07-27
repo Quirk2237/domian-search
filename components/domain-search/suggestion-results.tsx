@@ -39,7 +39,7 @@ export function SuggestionResults({ results }: SuggestionResultsProps) {
       animate="show"
     >
       <motion.h3 
-        className="text-sm font-medium text-gray-600 mb-4"
+        className="text-sm font-medium text-muted-foreground mb-4"
         variants={item}
       >
         AI-Powered Suggestions
@@ -47,7 +47,7 @@ export function SuggestionResults({ results }: SuggestionResultsProps) {
       {results.map((result, index) => (
         <motion.div
           key={result.domain}
-          className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-4 bg-white border border-gray-200 rounded-lg min-h-[56px] gap-3"
+          className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-4 bg-card border border-border rounded-lg min-h-[56px] gap-3"
           variants={item}
           whileHover={{ 
             scale: 1.02,
@@ -64,11 +64,11 @@ export function SuggestionResults({ results }: SuggestionResultsProps) {
               >
                 <Check className="h-5 w-5 text-green-500 flex-shrink-0" />
               </motion.div>
-              <span className="text-lg text-gray-900">{result.domain}</span>
+              <span className="text-lg text-foreground">{result.domain}</span>
             </div>
             {result.reason && (
               <motion.p 
-                className="mt-1 ml-8 text-sm text-gray-600"
+                className="mt-1 ml-8 text-sm text-muted-foreground"
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 transition={{ delay: index * 0.08 + 0.3 }}
@@ -79,7 +79,7 @@ export function SuggestionResults({ results }: SuggestionResultsProps) {
           </div>
           
           <div className="flex items-center space-x-4 sm:ml-4">
-            <span className="text-lg font-medium text-gray-900 whitespace-nowrap">
+            <span className="text-lg font-medium text-foreground whitespace-nowrap">
               ${EXTENSION_PRICES[result.extension] || 29.99}/year
             </span>
             <motion.a

@@ -3,8 +3,8 @@ export type SearchMode = 'domain' | 'suggestion'
 export function detectSearchMode(input: string): SearchMode {
   const trimmed = input.trim()
   
-  // If input contains spaces or is longer than 15 characters, it's likely a business idea
-  if (trimmed.includes(' ') || trimmed.length > 15) {
+  // Only switch to suggestion mode if input contains multiple words (spaces)
+  if (trimmed.includes(' ')) {
     return 'suggestion'
   }
   

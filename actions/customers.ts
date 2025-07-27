@@ -2,17 +2,14 @@
 
 import { db } from "@/db"
 import { customers, type SelectCustomer } from "@/db/schema/customers"
-import { currentUser } from "@clerk/nextjs/server"
 import { mvpCurrentUser } from "@/lib/auth-mvp"
 import { eq } from "drizzle-orm"
-
-const isMvpMode = process.env.NEXT_PUBLIC_MVP_MODE === "true"
 
 export async function getCustomerByUserId(
   userId: string
 ): Promise<SelectCustomer | null> {
-  if (!db || isMvpMode) {
-    // Return mock customer data in MVP mode
+  if (!db) {
+    // Return mock customer data when no DB
     return {
       id: "mvp-customer-id",
       userId,
@@ -36,10 +33,10 @@ export async function getBillingDataByUserId(userId: string): Promise<{
   clerkEmail: string | null
   stripeEmail: string | null
 }> {
-  // Get user data - use MVP mode if enabled
-  const user = isMvpMode ? await mvpCurrentUser() : await currentUser()
+  // Get user data
+  const user = await mvpCurrentUser()
 
-  if (!db || isMvpMode) {
+  if (!db) {
     // Return mock data in MVP mode
     return {
       customer: {
@@ -76,7 +73,7 @@ export async function getBillingDataByUserId(userId: string): Promise<{
 export async function createCustomer(
   userId: string
 ): Promise<{ isSuccess: boolean; data?: SelectCustomer }> {
-  if (!db || isMvpMode) {
+  if (!db) {
     // Return mock success in MVP mode
     return {
       isSuccess: true,
@@ -116,7 +113,7 @@ export async function updateCustomerByUserId(
   userId: string,
   updates: Partial<SelectCustomer>
 ): Promise<{ isSuccess: boolean; data?: SelectCustomer }> {
-  if (!db || isMvpMode) {
+  if (!db) {
     // Return mock success in MVP mode
     return {
       isSuccess: true,
@@ -155,7 +152,7 @@ export async function updateCustomerByStripeCustomerId(
   stripeCustomerId: string,
   updates: Partial<SelectCustomer>
 ): Promise<{ isSuccess: boolean; data?: SelectCustomer }> {
-  if (!db || isMvpMode) {
+  if (!db) {
     // Return mock success in MVP mode
     return {
       isSuccess: true,

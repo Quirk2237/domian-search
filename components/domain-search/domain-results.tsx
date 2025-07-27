@@ -38,7 +38,7 @@ export function DomainResults({ results }: DomainResultsProps) {
       animate="show"
     >
       <motion.h3 
-        className="text-sm font-medium text-gray-600 mb-4"
+        className="text-sm font-medium text-muted-foreground mb-4"
         variants={item}
       >
         Domain Availability
@@ -46,7 +46,7 @@ export function DomainResults({ results }: DomainResultsProps) {
       {results.map((result, index) => (
         <motion.div
           key={result.domain}
-          className="flex items-center justify-between p-4 bg-white border border-gray-200 rounded-lg min-h-[56px]"
+          className="flex items-center justify-between p-4 bg-card border border-border rounded-lg min-h-[56px]"
           variants={item}
           whileHover={{ 
             scale: 1.02,
@@ -60,7 +60,7 @@ export function DomainResults({ results }: DomainResultsProps) {
             ) : (
               <X className="h-5 w-5 text-red-500 flex-shrink-0" />
             )}
-            <span className={`text-lg ${result.available ? 'text-gray-900' : 'text-gray-500'}`}>
+            <span className={`text-lg ${result.available ? 'text-foreground' : 'text-muted-foreground'}`}>
               {result.domain}
             </span>
           </div>
@@ -68,7 +68,7 @@ export function DomainResults({ results }: DomainResultsProps) {
           <div className="flex items-center space-x-4">
             {result.available && (
               <>
-                <span className="text-lg font-medium text-gray-900">
+                <span className="text-lg font-medium text-foreground">
                   ${EXTENSION_PRICES[result.extension] || 29.99}/year
                 </span>
                 <a
@@ -83,7 +83,7 @@ export function DomainResults({ results }: DomainResultsProps) {
               </>
             )}
             {!result.available && (
-              <span className="text-sm text-gray-500">Taken</span>
+              <span className="text-sm text-muted-foreground">Taken</span>
             )}
           </div>
         </motion.div>

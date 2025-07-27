@@ -1,7 +1,11 @@
 'use client'
 
 import { DomainSearch } from '@/components/domain-search/domain-search'
-import { motion } from 'framer-motion'
+import { motion, AnimatePresence } from 'framer-motion'
+import { useTheme } from 'next-themes'
+import { Button } from '@/components/ui/button'
+import { Moon, Sun } from 'lucide-react'
+import { useEffect, useState } from 'react'
 
 const fadeInUp = {
   initial: { opacity: 0, y: 20 },
@@ -10,9 +14,52 @@ const fadeInUp = {
 }
 
 export default function MarketingPage() {
+  const { theme, setTheme } = useTheme()
+  const [mounted, setMounted] = useState(false)
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+
   return (
-    <main className="min-h-screen bg-gradient-to-b from-gray-50 to-white">
-      <div className="container mx-auto px-4 py-16 sm:py-24">
+    <>
+      {/* Theme Toggle Button - Outside AnimatePresence to prevent re-mounting */}
+      {mounted && (
+        <motion.div
+          initial={{ opacity: 0, scale: 0.8 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.3 }}
+          className="fixed top-4 right-4 z-50"
+        >
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+            className="bg-background/80 backdrop-blur-sm hover:bg-accent"
+          >
+            {theme === "dark" ? (
+              <Sun className="h-5 w-5" />
+            ) : (
+              <Moon className="h-5 w-5" />
+            )}
+            <span className="sr-only">Toggle theme</span>
+          </Button>
+        </motion.div>
+      )}
+      
+      <AnimatePresence mode="wait">
+        <motion.main 
+          key={theme}
+          className="min-h-screen bg-background relative"
+          initial={{ opacity: 0, scale: 0.98 }}
+          animate={{ opacity: 1, scale: 1 }}
+          exit={{ opacity: 0, scale: 0.98 }}
+          transition={{ 
+            duration: 0.3,
+            ease: "easeInOut"
+          }}
+        >
+          <div className="container mx-auto px-4 py-16 sm:py-24">
         <motion.div 
           className="text-center mb-12"
           initial="initial"
@@ -26,13 +73,13 @@ export default function MarketingPage() {
           }}
         >
           <motion.h1 
-            className="text-4xl sm:text-5xl lg:text-6xl font-bold text-gray-900 mb-4"
+            className="text-4xl sm:text-5xl lg:text-6xl font-bold text-foreground mb-4"
             variants={fadeInUp}
           >
             Wicked Simple Domains
           </motion.h1>
           <motion.p 
-            className="text-lg sm:text-xl text-gray-600 max-w-2xl mx-auto"
+            className="text-lg sm:text-xl text-muted-foreground max-w-2xl mx-auto"
             variants={fadeInUp}
           >
             Find the perfect domain name for your idea in seconds. 
@@ -55,7 +102,7 @@ export default function MarketingPage() {
         </motion.div>
         
         <motion.div 
-          className="text-center text-sm text-gray-500 mt-16"
+          className="text-center text-sm text-muted-foreground mt-16"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ duration: 0.5, delay: 0.4 }}
@@ -63,6 +110,8 @@ export default function MarketingPage() {
           <p>Over 1,000+ domain names found and registered</p>
         </motion.div>
       </div>
-    </main>
+        </motion.main>
+      </AnimatePresence>
+    </>
   )
 }

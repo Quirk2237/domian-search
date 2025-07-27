@@ -75,7 +75,7 @@ Create completely different alternatives.`
         content: query
       }
     ],
-    model: 'qwen/qwen3-32b',
+    model: 'llama-3.1-8b-instant',
     temperature: 0.4, // Slightly higher for more variety
     max_tokens: 2000
   })
@@ -123,10 +123,10 @@ async function checkDomainAvailability(domain: string, apiKey?: string): Promise
   }
   
   if (!apiKey) {
-    // Mock availability for demo - most domains should be available
-    const isAvailable = Math.random() > 0.2 // 80% availability rate
-    console.log(`Mock result for ${domain}: ${isAvailable}`)
-    return isAvailable
+    // Without API key, we can't verify availability
+    // Return false to be safe and avoid showing taken domains as available
+    console.log(`No Domainr API key for ${domain}: cannot verify availability`)
+    return false
   }
 
   try {
@@ -154,16 +154,27 @@ async function checkDomainAvailability(domain: string, apiKey?: string): Promise
     // Helper function to check if a status indicates availability
     const isStatusAvailable = (status: string) => {
       const statusLower = status?.toLowerCase() || ''
-      const availableKeywords = ['available', 'unknown', 'undelegated', 'inactive']
-      const takenKeywords = ['active', 'taken', 'reserved', 'premium', 'registered']
       
-      // Available if contains available keywords
-      const hasAvailableKeyword = availableKeywords.some(keyword => statusLower.includes(keyword))
-      // Not available if contains taken keywords (but not inactive)
-      const hasTakenKeyword = !statusLower.includes('inactive') && 
-                             takenKeywords.some(keyword => statusLower.includes(keyword))
+      // Domain is taken if it contains any of these statuses
+      if (statusLower.includes('active') || 
+          statusLower.includes('taken') || 
+          statusLower.includes('reserved') || 
+          statusLower.includes('premium') || 
+          statusLower.includes('registered')) {
+        return false
+      }
       
-      return hasAvailableKeyword && !hasTakenKeyword
+      // Domain is available if it contains these statuses (and not taken above)
+      if (statusLower.includes('inactive') || 
+          statusLower.includes('undelegated') ||
+          statusLower.includes('available') ||
+          statusLower.includes('unknown')) {
+        return true
+      }
+      
+      // Default to not available for unknown statuses
+      console.log(`Unknown domain status: "${status}" - defaulting to not available`)
+      return false
     }
     
     // A domain is available if ALL parts are available
@@ -192,10 +203,10 @@ async function checkDomainAvailability(domain: string, apiKey?: string): Promise
       console.log('API disabled for 5 minutes due to repeated failures')
     }
     
-    // Fall back to mock data on API error
-    const isAvailable = Math.random() > 0.2
-    console.log(`Fallback mock result for ${domain}: ${isAvailable}`)
-    return isAvailable
+    // Return false (not available) on API error to be safe
+    // This prevents showing taken domains as available
+    console.log(`API error for ${domain}: marking as not available to be safe`)
+    return false
   }
 }
 
@@ -257,17 +268,9 @@ export async function POST(request: NextRequest) {
     const domainrApiKey = process.env.DOMAINR_RAPIDAPI_KEY
 
     if (!groqApiKey) {
-      // Return mock suggestions if no API key
-      const mockSuggestions = [
-        { domain: 'smartbiz.com', available: true, extension: '.com', reason: 'Short, memorable, and business-focused' },
-        { domain: 'nexthub.io', available: true, extension: '.io', reason: 'Modern tech-focused domain' },
-        { domain: 'launchpad.co', available: true, extension: '.co', reason: 'Great for startups and new ventures' },
-        { domain: 'innovate.ai', available: true, extension: '.ai', reason: 'Perfect for AI and tech companies' },
-        { domain: 'growthlab.app', available: true, extension: '.app', reason: 'Ideal for SaaS and applications' }
-      ]
-      
-      cache.set(cacheKey, { data: mockSuggestions, timestamp: Date.now() })
-      return NextResponse.json({ suggestions: mockSuggestions })
+      // Return empty suggestions if no API key to avoid misleading results
+      console.log('No GROQ API key configured - returning empty suggestions')
+      return NextResponse.json({ suggestions: [] })
     }
 
     // Initialize Groq client
@@ -311,7 +314,7 @@ Rules:
             processedQuery
         }
       ],
-      model: 'qwen/qwen3-32b',
+      model: 'llama-3.1-8b-instant',
       temperature: 0.3,
       max_tokens: 2000
     })
@@ -389,6 +392,13 @@ Rules:
             const cleanDomain = formatDomainName(fullDomain)
             console.log(`Checking domain: original="${suggestion.domain}", extension="${suggestion.extension}", full="${fullDomain}", clean="${cleanDomain}"`)
             const available = await checkDomainAvailability(cleanDomain, domainrApiKey)
+            
+            // Log the result
+            if (available) {
+              console.log(`✓ Domain ${cleanDomain} is AVAILABLE`)
+            } else {
+              console.log(`✗ Domain ${cleanDomain} is TAKEN`)
+            }
             
             return {
               domain: cleanDomain,

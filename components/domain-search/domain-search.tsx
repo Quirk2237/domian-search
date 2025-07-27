@@ -1,9 +1,9 @@
 'use client'
 
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 import debounce from 'lodash.debounce'
 import { Search, Loader2 } from 'lucide-react'
-import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
 import { detectSearchMode } from '@/lib/domain-utils'
 import { DomainResults } from './domain-results'
 import { SuggestionResults } from './suggestion-results'
@@ -35,6 +35,40 @@ export function DomainSearch({ className }: DomainSearchProps) {
   const [domainResults, setDomainResults] = useState<DomainResult[]>([])
   const [suggestionResults, setSuggestionResults] = useState<SuggestionResult[]>([])
   const [error, setError] = useState<string | null>(null)
+  const [isSingleLine, setIsSingleLine] = useState(true)
+  const [previousMeaningfulContent, setPreviousMeaningfulContent] = useState('')
+  const [hasOverflow, setHasOverflow] = useState(false)
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
+
+  // Function to extract meaningful content
+  const getMeaningfulContent = (text: string): string => {
+    // Common filler words to ignore
+    const fillerWords = new Set([
+      'a', 'an', 'the', 'is', 'are', 'was', 'were', 'been', 'be', 'have', 'has', 
+      'had', 'do', 'does', 'did', 'will', 'would', 'could', 'should', 'may', 
+      'might', 'must', 'can', 'shall', 'to', 'of', 'in', 'for', 'on', 'with', 
+      'at', 'by', 'from', 'about', 'as', 'into', 'through', 'during', 'before', 
+      'after', 'above', 'below', 'between', 'under', 'again', 'further', 'then', 
+      'once', 'and', 'or', 'but', 'if', 'because', 'as', 'until', 'while',
+      'of', 'at', 'by', 'for', 'with', 'about', 'against', 'between', 'into',
+      'through', 'during', 'before', 'after', 'above', 'below', 'to', 'from',
+      'up', 'down', 'in', 'out', 'on', 'off', 'over', 'under', 'again'
+    ])
+    
+    // Remove punctuation and convert to lowercase
+    const words = text.toLowerCase()
+      .replace(/[.,;:!?'"()\[\]{}\-_]+/g, ' ')
+      .trim()
+      .split(/\s+/)
+      .filter(word => word.length > 0)
+    
+    // Filter out filler words and keep only meaningful words
+    const meaningfulWords = words.filter(word => 
+      !fillerWords.has(word) && word.length > 1
+    )
+    
+    return meaningfulWords.join(' ')
+  }
 
   // Create debounced search function
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -44,8 +78,16 @@ export function DomainSearch({ className }: DomainSearchProps) {
         setDomainResults([])
         setSuggestionResults([])
         setError(null)
+        setPreviousMeaningfulContent('')
         return
       }
+
+      // Check if meaningful content has changed
+      const currentMeaningfulContent = getMeaningfulContent(searchQuery)
+      if (currentMeaningfulContent === previousMeaningfulContent) {
+        return // Skip API call if no meaningful change
+      }
+      setPreviousMeaningfulContent(currentMeaningfulContent)
 
       setIsLoading(true)
       setError(null)
@@ -94,6 +136,14 @@ export function DomainSearch({ className }: DomainSearchProps) {
     debouncedSearch(query)
   }, [query, debouncedSearch])
 
+  // Check for overflow on mount and when query changes
+  useEffect(() => {
+    if (textareaRef.current) {
+      const hasScroll = textareaRef.current.scrollHeight > textareaRef.current.clientHeight
+      setHasOverflow(hasScroll)
+    }
+  }, [query])
+
   return (
     <div className={cn('w-full max-w-2xl mx-auto', className)}>
       <motion.div 
@@ -104,31 +154,63 @@ export function DomainSearch({ className }: DomainSearchProps) {
         <motion.div
           animate={{ scale: query ? [1, 1.2, 1] : 1 }}
           transition={{ duration: 0.3 }}
+          className={cn(
+            "absolute left-3 z-10",
+            isSingleLine ? "top-1/2 -translate-y-1/2" : "top-3"
+          )}
         >
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
+          <Search className="text-muted-foreground h-5 w-5" />
         </motion.div>
-        <Input
-          type="text"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="Enter a word or describe your idea"
-          className="pl-10 pr-10 h-14 text-base sm:text-lg rounded-xl shadow-lg border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
-          autoFocus
-          autoComplete="off"
-          autoCorrect="off"
-          autoCapitalize="off"
-          spellCheck="false"
-        />
+        <div className="relative">
+          <Textarea
+            ref={textareaRef}
+            value={query}
+            onChange={(e) => {
+              const newValue = e.target.value
+              setQuery(newValue)
+              // Check if it's single line (no newlines)
+              setIsSingleLine(!newValue.includes('\n'))
+              
+              // Check for overflow
+              if (textareaRef.current) {
+                const hasScroll = textareaRef.current.scrollHeight > textareaRef.current.clientHeight
+                setHasOverflow(hasScroll)
+              }
+            }}
+            placeholder="Enter a word or describe your idea"
+            className={cn(
+              "pl-10 pr-10 min-h-[56px] max-h-[300px] text-base sm:text-lg rounded-xl shadow-lg border-input focus:border-primary focus:ring-2 focus:ring-primary/20 resize-none overflow-y-auto",
+              isSingleLine ? "py-4" : "py-2"
+            )}
+            autoFocus
+            autoComplete="off"
+            autoCorrect="off"
+            autoCapitalize="off"
+            spellCheck={false}
+            onKeyDown={(e) => {
+              // Allow Enter to create new lines instead of submitting
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.stopPropagation()
+              }
+            }}
+          />
+          {hasOverflow && (
+            <div className="absolute bottom-0 left-0 right-0 h-12 bg-gradient-to-t from-white to-transparent pointer-events-none rounded-b-xl" />
+          )}
+        </div>
         <AnimatePresence>
           {isLoading && (
             <motion.div
-              className="absolute right-3 top-1/2 transform -translate-y-1/2"
+              className={cn(
+                "absolute right-3",
+                isSingleLine ? "top-1/2 -translate-y-1/2" : "top-3"
+              )}
               initial={{ opacity: 0, scale: 0.8 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.8 }}
               transition={{ duration: 0.2 }}
             >
-              <Loader2 className="h-5 w-5 animate-spin text-gray-400" />
+              <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
             </motion.div>
           )}
         </AnimatePresence>
@@ -184,7 +266,7 @@ export function DomainSearch({ className }: DomainSearchProps) {
                   <Loader2 className="h-8 w-8 animate-spin text-blue-500 mx-auto mb-3" />
                 </motion.div>
                 <motion.p 
-                  className="text-gray-600"
+                  className="text-muted-foreground"
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.1 }}
@@ -218,7 +300,7 @@ export function DomainSearch({ className }: DomainSearchProps) {
                 )}
                 {searchMode === 'suggestion' && suggestionResults.length === 0 && (
                   <motion.div 
-                    className="text-center py-8 text-gray-500"
+                    className="text-center py-8 text-muted-foreground"
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     exit={{ opacity: 0 }}

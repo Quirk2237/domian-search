@@ -1,7 +1,7 @@
 "use client"
 
 import { createCheckoutUrl } from "@/actions/stripe"
-import { useAuth } from "@clerk/nextjs"
+import { useAuth } from "@/lib/auth-hooks"
 import { useEffect, useState } from "react"
 import { toast } from "sonner"
 

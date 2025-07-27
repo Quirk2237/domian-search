@@ -8,7 +8,6 @@ import {
 } from "@/actions/customers"
 import { SelectCustomer } from "@/db/schema/customers"
 import { stripe } from "@/lib/stripe"
-import { auth } from "@clerk/nextjs/server"
 import { mvpAuth } from "@/lib/auth-mvp"
 import Stripe from "stripe"
 
@@ -141,9 +140,8 @@ export const createCheckoutUrl = async (
   paymentLinkUrl: string
 ): Promise<{ url: string | null; error: string | null }> => {
   try {
-    // Use MVP auth if enabled
-    const isMvpMode = process.env.NEXT_PUBLIC_MVP_MODE === "true"
-    const { userId } = isMvpMode ? mvpAuth() : await auth()
+    // Use MVP auth
+    const { userId } = mvpAuth()
 
     if (!userId) {
       return { url: null, error: "User must be authenticated" }

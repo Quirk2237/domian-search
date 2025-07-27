@@ -23,6 +23,7 @@ export const mvpCurrentUser = async () => {
     firstName: "Demo",
     lastName: "User",
     username: "demo-user",
+    imageUrl: null,
     profileImageUrl: null
   }
 }
