@@ -2,10 +2,7 @@
 
 import { DomainSearch } from '@/components/domain-search/domain-search'
 import { motion, AnimatePresence } from 'framer-motion'
-import { useTheme } from 'next-themes'
-import { Button } from '@/components/ui/button'
-import { Moon, Sun } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { ThemeToggle } from '@/components/theme-toggle'
 
 const fadeInUp = {
   initial: { opacity: 0, y: 20 },
@@ -14,42 +11,15 @@ const fadeInUp = {
 }
 
 export default function MarketingPage() {
-  const { theme, setTheme } = useTheme()
-  const [mounted, setMounted] = useState(false)
-
-  useEffect(() => {
-    setMounted(true)
-  }, [])
-
   return (
     <>
       {/* Theme Toggle Button - Outside AnimatePresence to prevent re-mounting */}
-      {mounted && (
-        <motion.div
-          initial={{ opacity: 0, scale: 0.8 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 0.3 }}
-          className="fixed top-4 right-4 z-50"
-        >
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-            className="bg-background/80 backdrop-blur-sm hover:bg-accent"
-          >
-            {theme === "dark" ? (
-              <Sun className="h-5 w-5" />
-            ) : (
-              <Moon className="h-5 w-5" />
-            )}
-            <span className="sr-only">Toggle theme</span>
-          </Button>
-        </motion.div>
-      )}
+      <div className="fixed top-4 right-4 z-50">
+        <ThemeToggle />
+      </div>
       
       <AnimatePresence mode="wait">
         <motion.main 
-          key={theme}
           className="min-h-screen bg-background relative"
           initial={{ opacity: 0, scale: 0.98 }}
           animate={{ opacity: 1, scale: 1 }}

@@ -38,6 +38,7 @@ export function DomainSearch({ className }: DomainSearchProps) {
   const [isSingleLine, setIsSingleLine] = useState(true)
   const [previousMeaningfulContent, setPreviousMeaningfulContent] = useState('')
   const [hasOverflow, setHasOverflow] = useState(false)
+  const [isAtBottom, setIsAtBottom] = useState(true)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
   // Function to extract meaningful content
@@ -74,7 +75,10 @@ export function DomainSearch({ className }: DomainSearchProps) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const debouncedSearch = useCallback(
     debounce(async (searchQuery: string) => {
-      if (!searchQuery.trim()) {
+      // Get the actual content without just whitespace/newlines
+      const trimmedQuery = searchQuery.trim()
+      
+      if (!trimmedQuery) {
         setDomainResults([])
         setSuggestionResults([])
         setError(null)
@@ -83,7 +87,7 @@ export function DomainSearch({ className }: DomainSearchProps) {
       }
 
       // Check if meaningful content has changed
-      const currentMeaningfulContent = getMeaningfulContent(searchQuery)
+      const currentMeaningfulContent = getMeaningfulContent(trimmedQuery)
       if (currentMeaningfulContent === previousMeaningfulContent) {
         return // Skip API call if no meaningful change
       }
@@ -92,7 +96,7 @@ export function DomainSearch({ className }: DomainSearchProps) {
       setIsLoading(true)
       setError(null)
 
-      const mode = detectSearchMode(searchQuery)
+      const mode = detectSearchMode(trimmedQuery)
       setSearchMode(mode)
       setLoadingMessage(mode === 'domain' ? 'Checking availability...' : 'Finding perfect domains for you...')
 
@@ -101,24 +105,30 @@ export function DomainSearch({ className }: DomainSearchProps) {
           const response = await fetch('/api/domains/check', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ domain: searchQuery })
+            body: JSON.stringify({ domain: trimmedQuery })
           })
           
-          if (!response.ok) throw new Error('Failed to check domain')
-          
           const data = await response.json()
+          
+          if (!response.ok) {
+            throw new Error(data.error || 'Failed to check domain')
+          }
+          
           setDomainResults(data.results)
           setSuggestionResults([])
         } else {
           const response = await fetch('/api/domains/suggest', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ query: searchQuery })
+            body: JSON.stringify({ query: trimmedQuery })
           })
           
-          if (!response.ok) throw new Error('Failed to get suggestions')
-          
           const data = await response.json()
+          
+          if (!response.ok) {
+            throw new Error(data.error || 'Failed to get suggestions')
+          }
+          
           console.log('Received suggestions:', data.suggestions)
           setSuggestionResults(data.suggestions || [])
           setDomainResults([])
@@ -128,7 +138,7 @@ export function DomainSearch({ className }: DomainSearchProps) {
       } finally {
         setIsLoading(false)
       }
-    }, 150),
+    }, 500), // Increased from 150ms to reduce API calls
     []
   )
 
@@ -141,8 +151,26 @@ export function DomainSearch({ className }: DomainSearchProps) {
     if (textareaRef.current) {
       const hasScroll = textareaRef.current.scrollHeight > textareaRef.current.clientHeight
       setHasOverflow(hasScroll)
+      
+      // Check if at bottom
+      if (hasScroll) {
+        const { scrollTop, scrollHeight, clientHeight } = textareaRef.current
+        const atBottom = scrollTop + clientHeight >= scrollHeight - 5 // 5px threshold
+        setIsAtBottom(atBottom)
+      } else {
+        setIsAtBottom(true)
+      }
     }
   }, [query])
+  
+  // Handle scroll events
+  const handleScroll = useCallback(() => {
+    if (textareaRef.current && hasOverflow) {
+      const { scrollTop, scrollHeight, clientHeight } = textareaRef.current
+      const atBottom = scrollTop + clientHeight >= scrollHeight - 5 // 5px threshold
+      setIsAtBottom(atBottom)
+    }
+  }, [hasOverflow])
 
   return (
     <div className={cn('w-full max-w-2xl mx-auto', className)}>
@@ -177,9 +205,10 @@ export function DomainSearch({ className }: DomainSearchProps) {
                 setHasOverflow(hasScroll)
               }
             }}
+            onScroll={handleScroll}
             placeholder="Enter a word or describe your idea"
             className={cn(
-              "pl-10 pr-10 min-h-[56px] max-h-[300px] text-base sm:text-lg rounded-xl shadow-lg border-input focus:border-primary focus:ring-2 focus:ring-primary/20 resize-none overflow-y-auto",
+              "pl-10 pr-10 min-h-[56px] max-h-[300px] text-base sm:text-lg rounded-xl shadow-lg border-input focus:border-primary focus:ring-2 focus:ring-primary/20 resize-none overflow-y-auto transition-all duration-300",
               isSingleLine ? "py-4" : "py-2"
             )}
             autoFocus
@@ -194,8 +223,8 @@ export function DomainSearch({ className }: DomainSearchProps) {
               }
             }}
           />
-          {hasOverflow && (
-            <div className="absolute bottom-0 left-0 right-0 h-12 bg-gradient-to-t from-white to-transparent pointer-events-none rounded-b-xl" />
+          {hasOverflow && !isAtBottom && (
+            <div className="absolute bottom-0 left-0 right-0 h-12 bg-gradient-to-t from-background to-transparent pointer-events-none rounded-b-xl" />
           )}
         </div>
         <AnimatePresence>
@@ -238,7 +267,7 @@ export function DomainSearch({ className }: DomainSearchProps) {
       </AnimatePresence>
 
       <AnimatePresence mode="wait">
-        {!error && query.trim() && (
+        {!error && query.trim() && !isLoading && (
           <motion.div 
             className="mt-6"
             initial={{ opacity: 0, height: 0 }}
@@ -246,70 +275,40 @@ export function DomainSearch({ className }: DomainSearchProps) {
             exit={{ opacity: 0, height: 0 }}
             transition={{ duration: 0.3 }}
           >
-            {isLoading ? (
-              <motion.div 
-                className="text-center py-8"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-              >
+            <AnimatePresence mode="wait">
+              {searchMode === 'domain' && domainResults.length > 0 && (
                 <motion.div
-                  animate={{ 
-                    scale: [0.95, 1.05, 0.95],
-                  }}
-                  transition={{ 
-                    duration: 1.5,
-                    repeat: Infinity,
-                    ease: "easeInOut"
-                  }}
-                >
-                  <Loader2 className="h-8 w-8 animate-spin text-blue-500 mx-auto mb-3" />
-                </motion.div>
-                <motion.p 
-                  className="text-muted-foreground"
-                  initial={{ opacity: 0, y: 10 }}
+                  key="domain-results"
+                  initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.1 }}
+                  exit={{ opacity: 0, y: -20 }}
+                  transition={{ duration: 0.3 }}
                 >
-                  {loadingMessage}
-                </motion.p>
-              </motion.div>
-            ) : (
-              <AnimatePresence mode="wait">
-                {searchMode === 'domain' && domainResults.length > 0 && (
-                  <motion.div
-                    key="domain-results"
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -20 }}
-                    transition={{ duration: 0.3 }}
-                  >
-                    <DomainResults results={domainResults} />
-                  </motion.div>
-                )}
-                {searchMode === 'suggestion' && suggestionResults.length > 0 && (
-                  <motion.div
-                    key="suggestion-results"
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -20 }}
-                    transition={{ duration: 0.3 }}
-                  >
-                    <SuggestionResults results={suggestionResults} />
-                  </motion.div>
-                )}
-                {searchMode === 'suggestion' && suggestionResults.length === 0 && (
-                  <motion.div 
-                    className="text-center py-8 text-muted-foreground"
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                  >
-                    No available domains found. Try a different search term.
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            )}
+                  <DomainResults results={domainResults} />
+                </motion.div>
+              )}
+              {searchMode === 'suggestion' && suggestionResults.length > 0 && (
+                <motion.div
+                  key="suggestion-results"
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -20 }}
+                  transition={{ duration: 0.3 }}
+                >
+                  <SuggestionResults results={suggestionResults} />
+                </motion.div>
+              )}
+              {searchMode === 'suggestion' && suggestionResults.length === 0 && (
+                <motion.div 
+                  className="text-center py-8 text-muted-foreground"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                >
+                  No available domains found. Try a different search term.
+                </motion.div>
+              )}
+            </AnimatePresence>
           </motion.div>
         )}
       </AnimatePresence>

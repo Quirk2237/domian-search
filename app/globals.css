@@ -148,9 +148,43 @@
 @layer base {
   * {
     @apply border-border outline-ring/50;
+    transition: border-color 0.3s ease, outline-color 0.3s ease;
   }
   body {
     @apply bg-background text-foreground;
     font-family: var(--font-geist-mono), monospace;
+    transition: background-color 0.3s ease, color 0.3s ease;
+  }
+  
+  /* Add transitions to common theme-sensitive elements */
+  input, textarea, button, div, section, main, header, footer, nav, aside {
+    transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
+  }
+  
+  /* Specific transitions for UI components */
+  .bg-background, .bg-card, .bg-popover, .bg-primary, .bg-secondary, 
+  .bg-muted, .bg-accent, .bg-destructive {
+    transition: background-color 0.3s ease;
+  }
+  
+  .text-foreground, .text-card-foreground, .text-popover-foreground, 
+  .text-primary-foreground, .text-secondary-foreground, .text-muted-foreground, 
+  .text-accent-foreground, .text-destructive-foreground {
+    transition: color 0.3s ease;
+  }
+  
+  .border, .border-border, .border-input {
+    transition: border-color 0.3s ease;
+  }
+  
+  /* Transition for shadows */
+  [class*="shadow-"] {
+    transition: box-shadow 0.3s ease;
+  }
+  
+  /* Transition for gradients */
+  .bg-gradient-to-t, .bg-gradient-to-b, .bg-gradient-to-l, .bg-gradient-to-r,
+  .bg-gradient-to-tl, .bg-gradient-to-tr, .bg-gradient-to-bl, .bg-gradient-to-br {
+    transition: background 0.3s ease;
   }
 }

@@ -45,3 +45,38 @@ export const EXTENSION_PRICES: Record<string, number> = {
   '.store': 49.99,
   '.site': 29.99
 }
+
+export function parseDomainInput(input: string): {
+  baseDomain: string
+  extension?: string
+  hasExtension: boolean
+} {
+  const cleaned = input.toLowerCase().trim()
+  
+  // Check if input contains a known extension
+  for (const ext of POPULAR_EXTENSIONS) {
+    if (cleaned.endsWith(ext)) {
+      return {
+        baseDomain: cleaned.slice(0, -ext.length),
+        extension: ext,
+        hasExtension: true
+      }
+    }
+  }
+  
+  // Check for any extension pattern (dot followed by 2-6 letters)
+  const extensionMatch = cleaned.match(/^(.+)(\.[a-z]{2,6})$/)
+  if (extensionMatch) {
+    return {
+      baseDomain: extensionMatch[1],
+      extension: extensionMatch[2],
+      hasExtension: true
+    }
+  }
+  
+  // No extension found
+  return {
+    baseDomain: cleaned,
+    hasExtension: false
+  }
+}

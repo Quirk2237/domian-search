@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import Groq from 'groq-sdk'
-import axios from 'axios'
+import axios, { AxiosError } from 'axios'
 import { formatDomainName } from '@/lib/domain-utils'
 import { getClientIp, checkRateLimit } from '@/lib/rate-limit'
+import { getCachedDomainAvailability, setCachedDomainAvailability, throttleRequest } from '@/lib/domain-cache'
 
 // Simple in-memory cache
 interface SuggestionResult {
@@ -114,6 +115,13 @@ Create completely different alternatives.`
 }
 
 async function checkDomainAvailability(domain: string, apiKey?: string): Promise<boolean> {
+  // Check cache first
+  const cached = getCachedDomainAvailability(domain)
+  if (cached !== null) {
+    console.log(`Cache hit for ${domain}: ${cached}`)
+    return cached
+  }
+  
   console.log(`Checking availability for: ${domain}, API key exists: ${!!apiKey}`)
   
   // Check if API is temporarily disabled due to failures
@@ -128,6 +136,9 @@ async function checkDomainAvailability(domain: string, apiKey?: string): Promise
     console.log(`No Domainr API key for ${domain}: cannot verify availability`)
     return false
   }
+  
+  // Throttle API requests
+  await throttleRequest()
 
   try {
     const response = await axios.get(`https://domainr.p.rapidapi.com/v2/status`, {
@@ -155,25 +166,37 @@ async function checkDomainAvailability(domain: string, apiKey?: string): Promise
     const isStatusAvailable = (status: string) => {
       const statusLower = status?.toLowerCase() || ''
       
-      // Domain is taken if it contains any of these statuses
-      if (statusLower.includes('active') || 
-          statusLower.includes('taken') || 
-          statusLower.includes('reserved') || 
-          statusLower.includes('premium') || 
-          statusLower.includes('registered')) {
-        return false
+      // Check for statuses that indicate the domain is NOT available
+      const unavailableStatuses = [
+        'active', 'parked', 'marketed', 'claimed', 'reserved', 'dpml', 'premium',
+        'expiring', 'deleting', 'priced', 'transferable', 'pending',
+        'disallowed', 'invalid', 'suffix', 'zone', 'tld'
+      ]
+      
+      // If status contains any unavailable keyword, it's not available
+      // We need to be careful with substring matching - use word boundaries
+      for (const unavailableStatus of unavailableStatuses) {
+        // Create a regex with word boundaries to avoid false matches
+        // For example, "marketed" should not match in "undelegated"
+        const regex = new RegExp(`\\b${unavailableStatus}\\b`)
+        if (regex.test(statusLower)) {
+          return false
+        }
       }
       
-      // Domain is available if it contains these statuses (and not taken above)
-      if (statusLower.includes('inactive') || 
-          statusLower.includes('undelegated') ||
-          statusLower.includes('available') ||
-          statusLower.includes('unknown')) {
+      // Check for available statuses
+      // "inactive" or "undelegated" indicate availability
+      if (statusLower.includes('inactive') || statusLower.includes('undelegated')) {
         return true
       }
       
-      // Default to not available for unknown statuses
-      console.log(`Unknown domain status: "${status}" - defaulting to not available`)
+      // Special case: "unknown" status means error/misconfiguration, not available
+      if (statusLower.includes('unknown')) {
+        return false
+      }
+      
+      // Log truly unexpected statuses
+      console.log(`Unexpected domain status: "${status}" - marking as not available`)
       return false
     }
     
@@ -192,9 +215,14 @@ async function checkDomainAvailability(domain: string, apiKey?: string): Promise
     
     // Reset failure count on success
     apiFailureCount = 0
+    
+    // Cache the result
+    setCachedDomainAvailability(domain, isAvailable)
+    
     return isAvailable
   } catch (error) {
-    console.error('Error checking domain via API:', error instanceof Error ? error.message : 'Unknown error')
+    const axiosError = error as AxiosError<{ message: string }>
+    console.error('Error checking domain via API:', axiosError.response?.status, axiosError.response?.data || axiosError.message)
     
     // Increment failure count and disable API if too many failures
     apiFailureCount++
@@ -203,10 +231,8 @@ async function checkDomainAvailability(domain: string, apiKey?: string): Promise
       console.log('API disabled for 5 minutes due to repeated failures')
     }
     
-    // Return false (not available) on API error to be safe
-    // This prevents showing taken domains as available
-    console.log(`API error for ${domain}: marking as not available to be safe`)
-    return false
+    // Throw the error to be handled by the caller
+    throw axiosError
   }
 }
 
@@ -363,8 +389,8 @@ Rules:
       const allSuggestedDomains: string[] = []
       let availableDomains: SuggestionResult[] = []
       let retryCount = 0
-      const maxRetries = 3 // Reduced to avoid rate limits
-      const targetAvailableDomains = 5
+      const maxRetries = 1 // Reduced from 3 to avoid rate limits
+      const targetAvailableDomains = 3 // Reduced from 5 to minimize API calls
       
       // Keep trying until we have enough available domains or hit max retries
       while (availableDomains.length < targetAvailableDomains && retryCount < maxRetries) {
@@ -374,23 +400,29 @@ Rules:
         const currentBatch = retryCount === 0 ? suggestedDomains : 
           await generateMoreSuggestions(processedQuery, allSuggestedDomains, groqApiKey)
         
-        // Check availability for each suggested domain
-        const suggestionsWithAvailability = await Promise.all(
-          currentBatch.slice(0, 10).map(async (suggestion: { domain: string; extension?: string; reason?: string }) => {
-            // Ensure domain includes extension if not already present
-            let fullDomain = suggestion.domain
-            if (!fullDomain.includes('.') && suggestion.extension) {
-              // Remove extension from domain if it's been incorrectly appended without dot
-              const extensionWithoutDot = suggestion.extension.substring(1)
-              if (fullDomain.endsWith(extensionWithoutDot)) {
-                fullDomain = fullDomain.slice(0, -extensionWithoutDot.length) + suggestion.extension
-              } else {
-                fullDomain = fullDomain + suggestion.extension
-              }
+        // Check availability for each suggested domain (reduced batch size)
+        const batchSize = 5 // Reduced from 10
+        const suggestionsToCheck = currentBatch.slice(0, batchSize)
+        
+        // Process domains sequentially with delay to avoid rate limits
+        const suggestionsWithAvailability = []
+        for (const suggestion of suggestionsToCheck) {
+          // Ensure domain includes extension if not already present
+          let fullDomain = suggestion.domain
+          if (!fullDomain.includes('.') && suggestion.extension) {
+            // Remove extension from domain if it's been incorrectly appended without dot
+            const extensionWithoutDot = suggestion.extension.substring(1)
+            if (fullDomain.endsWith(extensionWithoutDot)) {
+              fullDomain = fullDomain.slice(0, -extensionWithoutDot.length) + suggestion.extension
+            } else {
+              fullDomain = fullDomain + suggestion.extension
             }
-            
-            const cleanDomain = formatDomainName(fullDomain)
-            console.log(`Checking domain: original="${suggestion.domain}", extension="${suggestion.extension}", full="${fullDomain}", clean="${cleanDomain}"`)
+          }
+          
+          const cleanDomain = formatDomainName(fullDomain)
+          console.log(`Checking domain: original="${suggestion.domain}", extension="${suggestion.extension}", full="${fullDomain}", clean="${cleanDomain}"`)
+          
+          try {
             const available = await checkDomainAvailability(cleanDomain, domainrApiKey)
             
             // Log the result
@@ -400,20 +432,35 @@ Rules:
               console.log(`✗ Domain ${cleanDomain} is TAKEN`)
             }
             
-            return {
+            suggestionsWithAvailability.push({
               domain: cleanDomain,
               available,
               extension: suggestion.extension || '.com',
               reason: suggestion.reason
-            }
-          })
-        )
+            })
+          } catch (error) {
+            // If domain check fails, don't include it in results
+            console.log(`✗ Domain ${cleanDomain} check failed`)
+          }
+        }
+        
+        // Filter out failed checks
+        const validSuggestions = suggestionsWithAvailability.filter(s => s !== null) as SuggestionResult[]
+        
+        // If all domain checks failed due to API errors, throw error
+        if (validSuggestions.length === 0 && suggestionsWithAvailability.length > 0) {
+          const error = new Error('Domain availability API is unavailable')
+          if (apiDisabledUntil > Date.now()) {
+            throw new Error('Too many requests. Please try again later.')
+          }
+          throw error
+        }
         
         // Add all suggested domains to our tracking list
-        allSuggestedDomains.push(...suggestionsWithAvailability.map(d => d.domain))
+        allSuggestedDomains.push(...validSuggestions.map(d => d.domain))
         
         // Filter available domains and add to our results
-        const newAvailableDomains = suggestionsWithAvailability.filter(d => d.available)
+        const newAvailableDomains = validSuggestions.filter(d => d.available)
         availableDomains.push(...newAvailableDomains)
         
         console.log(`Found ${newAvailableDomains.length} available domains in this batch`)
@@ -449,8 +496,24 @@ Rules:
     }
   } catch (error) {
     console.error('Domain suggestion error:', error)
+    
+    // Check if it's a specific error message
+    if (error instanceof Error) {
+      if (error.message.includes('Too many requests')) {
+        return NextResponse.json(
+          { error: 'Too many requests. Please try again later.' },
+          { status: 429 }
+        )
+      } else if (error.message.includes('API is unavailable')) {
+        return NextResponse.json(
+          { error: 'Domain availability service is currently unavailable. Please try again later.' },
+          { status: 503 }
+        )
+      }
+    }
+    
     return NextResponse.json(
-      { error: 'Failed to generate domain suggestions' },
+      { error: 'Failed to generate domain suggestions. Please try again later.' },
       { status: 500 }
     )
   }
