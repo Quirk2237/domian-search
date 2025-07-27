@@ -221,8 +221,15 @@ async function checkDomainAvailability(domain: string, apiKey?: string): Promise
     
     return isAvailable
   } catch (error) {
-    const axiosError = error as AxiosError<{ message: string }>
-    console.error('Error checking domain via API:', axiosError.response?.status, axiosError.response?.data || axiosError.message)
+    const axiosError = error as AxiosError<{ message: string; error?: { message?: string } }>
+    console.error('Domainr API error:', axiosError.response?.status, axiosError.response?.data || axiosError.message)
+    
+    // Check for 401 unauthorized specifically
+    if (axiosError.response?.status === 401) {
+      console.error('Domainr API key is invalid')
+      // Don't increment failure count for auth errors
+      throw new Error('Invalid Domainr API key')
+    }
     
     // Increment failure count and disable API if too many failures
     apiFailureCount++
@@ -303,7 +310,9 @@ export async function POST(request: NextRequest) {
     const groq = new Groq({ apiKey: groqApiKey })
 
     // Generate domain suggestions using AI
-    const completion = await groq.chat.completions.create({
+    let completion
+    try {
+      completion = await groq.chat.completions.create({
       messages: [
         {
           role: 'system',
@@ -344,6 +353,16 @@ Rules:
       temperature: 0.3,
       max_tokens: 2000
     })
+    } catch (groqError: any) {
+      console.error('GROQ API error:', groqError.status, groqError.message)
+      if (groqError.status === 401) {
+        return NextResponse.json(
+          { error: 'Invalid GROQ API key. Please check your environment configuration.' },
+          { status: 500 }
+        )
+      }
+      throw groqError
+    }
 
     const responseContent = completion.choices[0]?.message?.content || '[]'
     
@@ -438,9 +457,14 @@ Rules:
               extension: suggestion.extension || '.com',
               reason: suggestion.reason
             })
-          } catch (error) {
+          } catch (error: any) {
             // If domain check fails, don't include it in results
-            console.log(`✗ Domain ${cleanDomain} check failed`)
+            console.log(`✗ Domain ${cleanDomain} check failed:`, error.message)
+            
+            // If it's an API key error, throw it to stop processing
+            if (error.message === 'Invalid Domainr API key') {
+              throw error
+            }
           }
         }
         
@@ -508,6 +532,11 @@ Rules:
         return NextResponse.json(
           { error: 'Domain availability service is currently unavailable. Please try again later.' },
           { status: 503 }
+        )
+      } else if (error.message === 'Invalid Domainr API key') {
+        return NextResponse.json(
+          { error: 'Invalid domain checking API key. Please check your Domainr API configuration.' },
+          { status: 500 }
         )
       }
     }
