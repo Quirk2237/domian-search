@@ -4,6 +4,7 @@ import { DomainSearch } from '@/components/domain-search/domain-search'
 import { motion, AnimatePresence } from 'framer-motion'
 import { ThemeToggle } from '@/components/theme-toggle'
 import { useState } from 'react'
+import { cn } from '@/lib/utils'
 
 const fadeInUp = {
   initial: { opacity: 0, y: 20 },
@@ -13,9 +14,20 @@ const fadeInUp = {
 
 export default function MarketingPage() {
   const [hasContent, setHasContent] = useState(false)
+  const [hasResults, setHasResults] = useState(false)
   
   const handleQueryChange = (query: string) => {
     setHasContent(query.trim().length > 0)
+  }
+  
+  const handleResultsChange = (results: boolean) => {
+    setHasResults(results)
+  }
+  
+  // Unified animation configuration
+  const animationConfig = {
+    duration: 0.4,
+    ease: "easeInOut"
   }
   return (
     <>
@@ -36,12 +48,11 @@ export default function MarketingPage() {
           }}
         >
           <motion.div 
-            className="container mx-auto px-4 w-full"
-            animate={{
-              paddingTop: hasContent ? '4rem' : '0',
-              paddingBottom: hasContent ? '4rem' : '0'
-            }}
-            transition={{ duration: 0.5, ease: "easeInOut" }}
+            className={cn(
+              "container mx-auto px-4 w-full",
+              hasResults ? "py-8 sm:py-12 lg:py-16" : ""
+            )}
+            transition={animationConfig}
           >
         <motion.div 
           className="text-center mb-12"
@@ -56,11 +67,18 @@ export default function MarketingPage() {
           }}
         >
           <motion.h1 
-            className="font-bold text-foreground mb-4 transition-all duration-500"
-            variants={fadeInUp}
+            className={cn(
+              "font-bold text-foreground mb-4 transition-all",
+              hasResults 
+                ? "text-xl sm:text-2xl lg:text-3xl" 
+                : "text-2xl sm:text-4xl lg:text-6xl"
+            )}
+            initial={fadeInUp.initial}
             animate={{
-              fontSize: hasContent ? '1.875rem' : '3.75rem' // text-3xl vs text-6xl
+              opacity: 1,
+              y: 0
             }}
+            transition={animationConfig}
           >
             Wicked Simple Domains
           </motion.h1>
@@ -77,17 +95,17 @@ export default function MarketingPage() {
             damping: 30
           }}
         >
-          <DomainSearch className="mb-16" onQueryChange={handleQueryChange} />
+          <DomainSearch className="mb-16" onQueryChange={handleQueryChange} onResultsChange={handleResultsChange} />
         </motion.div>
         
         <AnimatePresence>
           {!hasContent && (
             <motion.div 
               className="text-center text-sm text-muted-foreground mt-16"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.3 }}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 10 }}
+              transition={animationConfig}
             >
               <p>Enter a word or describe your idea to get started</p>
             </motion.div>

@@ -13,6 +13,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 interface DomainSearchProps {
   className?: string
   onQueryChange?: (query: string) => void
+  onResultsChange?: (hasResults: boolean) => void
 }
 
 interface DomainResult {
@@ -28,7 +29,7 @@ interface SuggestionResult {
   reason?: string
 }
 
-export function DomainSearch({ className, onQueryChange }: DomainSearchProps) {
+export function DomainSearch({ className, onQueryChange, onResultsChange }: DomainSearchProps) {
   const [query, setQuery] = useState('')
   const [searchMode, setSearchMode] = useState<'domain' | 'suggestion'>('domain')
   const [isLoading, setIsLoading] = useState(false)
@@ -164,6 +165,14 @@ export function DomainSearch({ className, onQueryChange }: DomainSearchProps) {
     }
   }, [query])
   
+  // Notify parent when results change
+  useEffect(() => {
+    if (onResultsChange) {
+      const hasResults = domainResults.length > 0 || suggestionResults.length > 0
+      onResultsChange(hasResults)
+    }
+  }, [domainResults, suggestionResults, onResultsChange])
+  
   // Handle scroll events
   const handleScroll = useCallback(() => {
     if (textareaRef.current && hasOverflow) {
@@ -213,8 +222,8 @@ export function DomainSearch({ className, onQueryChange }: DomainSearchProps) {
             }}
             onScroll={handleScroll}
             className={cn(
-              "pl-10 pr-10 min-h-[56px] max-h-[300px] text-base sm:text-lg rounded-xl shadow-lg border-input focus:border-primary focus:ring-2 focus:ring-primary/20 resize-none overflow-y-auto transition-all duration-300",
-              isSingleLine ? "py-4" : "py-2"
+              "pl-10 pr-10 min-h-[48px] sm:min-h-[56px] max-h-[300px] text-base sm:text-lg rounded-xl shadow-lg border-input focus:border-primary focus:ring-2 focus:ring-primary/20 resize-none overflow-y-auto transition-all duration-300",
+              isSingleLine ? "py-3 sm:py-4" : "py-2"
             )}
             autoFocus
             autoComplete="off"
