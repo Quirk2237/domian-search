@@ -91,7 +91,7 @@ Format your response as JSON:
 }`
 
     const completion = await anthropic.messages.create({
-      model: 'claude-3-5-sonnet-latest',
+      model: 'claude-sonnet-4-20250514',
       max_tokens: 4000,
       temperature: 0.3,
       messages: [
