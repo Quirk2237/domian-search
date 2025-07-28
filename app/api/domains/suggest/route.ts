@@ -32,6 +32,8 @@ async function generateMoreSuggestions(
   groqApiKey?: string,
   retryCount: number = 0
 ): Promise<Array<{ domain: string; extension?: string; reason?: string }>> {
+  console.log(`Generating more suggestions for retry ${retryCount}. Original query:`, query)
+  
   if (!groqApiKey) {
     // Return empty array if no API key
     return []
@@ -306,6 +308,8 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       )
     }
+    
+    console.log('User input for domain suggestions:', query)
 
     // Preprocess very long queries to extract key concepts
     let processedQuery = query
@@ -322,6 +326,7 @@ export async function POST(request: NextRequest) {
       ].filter(Boolean).join(' ')
       
       processedQuery = `${query.substring(0, 300)}... KEY CONCEPTS: ${keyPhrases || query.substring(0, 100)}`
+      console.log('Processed query (truncated):', processedQuery)
     }
     
     // Check cache first
@@ -346,45 +351,120 @@ export async function POST(request: NextRequest) {
 
     // Store the current prompt for evaluation
     const currentPrompt = `You are an expert domain name strategist. Generate domain suggestions using this valuation framework:
+CORE WEIGHTS: Brandability (30%) > TLD Extension (25%) > Length (20%) > Pronunciation (15%) > Future-proofing (10%)
+CRITICAL USER REQUIREMENTS: If the user specifies ANY requirements (e.g., 'only .com domains', '10-letter domain'), you MUST follow these EXACTLY. Override all other rules.
+MANDATORY TLD DISTRIBUTION:
 
-CORE WEIGHTS: Brandability (26%) > TLD Extension (22%) > Keywords/SEO (21%) > Length (21%) > History potential (9%)
+60% must be .com domains (6 out of 10)
+40% can be alternative TLDs (.app, .ai, .io) only if exceptional fit
 
-CRITICAL USER REQUIREMENTS: If the user specifies ANY requirements (e.g., 'only .com domains', '10-letter domain', 'domains starting with tech'), you MUST follow these EXACTLY. Override all other rules.
+ANTI-GENERIC FILTER (CRITICAL):
+BANNED PATTERNS - Never use these:
 
-LENGTH COUNTING: When user specifies domain length, count ONLY characters BEFORE the extension:
-- "hatsbylaxx.com" = 10 letters (correct for "10-letter domain")
-- "techstart.io" = 9 letters (correct for "9-letter domain")
+Single dictionary words + common TLDs (mind.com, brain.com, think.com)
+[CommonWord] + [CommonWord] (BrandForge, BrandPulse, ThinkLab)
+[Tech/Business Term] + [Generic Suffix] (*tech, *hub, *lab, *zone, *core, *spark)
+Direct descriptors of function (BrandClarity, IdentityBuilder)
+Overused startup patterns (Get*, Use*, Try*, My*, The*)
+Common prefixes/suffixes: Smart*, Super*, Best*, Pro*, Plus*, Max*
 
-GENERATION PROCESS:
-1. Analyze app idea: Extract core function, target audience, unique value, key benefits
-2. Generate by tier:
-   - Tier 1: Premium single-word .com (3-10 chars)
-   - Tier 2: Two-word brandable .com (6-15 chars total)
-   - Tier 3: Invented brandable .com (5-10 chars, phonetically simple)
-   - Tier 4: Alternative TLDs (.ai, .io, .app) only if perfect match
-3. Apply quality filters: Radio test, phone test, memory test, typing test
-4. Prioritize: Initial plosives (P,B,T,D,K,G), alliteration, emotional resonance
+REQUIRED CREATIVITY TECHNIQUES:
 
-OUTPUT FORMAT - JSON array with exactly 10 domains distributed across tiers:
-[
-  {"domain":"voice.com","extension":".com","reason":"Premium single-word, instant brand recognition"},
-  {"domain":"paypal.com","extension":".com","reason":"Two-word brandable, natural pairing"},
-  {"domain":"spotify.com","extension":".com","reason":"Invented brandable, memorable sound"},
-  {"domain":"genius.ai","extension":".ai","reason":"Perfect AI keyword match"}
+Letter substitution/addition: Add or change 1-2 letters in real words
+
+Examples: Flickr (flicker), Tumblr (tumbler), Reddit (read it)
+
+
+Portmanteaus: Blend two words in unexpected ways
+
+Examples: Pinterest (pin + interest), Groupon (group + coupon)
+
+
+Foreign language roots: Use non-English words or roots
+
+Examples: Vimeo (video + me), Etsy (Italian "etsi")
+
+
+Sound-alike inventions: Create words that sound real but aren't
+
+Examples: Spotify, Shopify, Zillow, Venmo
+
+
+Abstract concepts: Use words unrelated to function
+
+Examples: Apple (computers), Amazon (books), Uber (transport)
+
+
+
+GENERATION STRATEGY:
+For brand clarity app, think abstractly:
+
+Light/vision metaphors (but not obvious like "clear" or "vision")
+Geometric/mathematical concepts
+Musical/harmony terms
+Natural phenomena
+Color/spectrum references
+Architectural terms
+
+Avoid direct brand/identity words entirely.
+WORD CONSTRUCTION RULES:
+
+Invent 40% completely: Should pass spell-check but not be in dictionary
+Modify 30%: Real words with 1-2 letter changes
+Abstract 20%: Real words with no obvious connection
+Blend 10%: Unexpected portmanteaus
+
+Length requirements:
+
+5-8 characters (premium tier)
+9-12 characters (standard tier)
+Never exceed 12 characters
+
+PRONUNCIATION REQUIREMENTS:
+
+Maximum 3 syllables
+No more than 2 consonants in a row
+Include at least one vowel every 2-3 letters
+Should be typeable from hearing it ONCE
+
+EXAMPLES OF GOOD CREATIVITY:
+For a brand clarity app:
+
+Prizmo (prism + o ending)
+Lucidy (lucid + y)
+Clarifi (clarity + fi)
+Luminar (luminous + ar)
+Crysto (crystal + o)
+Purifi (purify + i)
+Gleamr (gleam + r)
+Shimra (shimmer + a)
+Focusy (focus + y)
+Beamly (beam + ly)
+
+OUTPUT FORMAT - JSON array with exactly 10 domains:
+json[
+  {"domain":"prizmo.com","extension":".com","reason":"Modified 'prism' with -o ending, suggests clarity through unique lens, memorable 6 letters"},
+  {"domain":"lucidy.com","extension":".com","reason":"Blends 'lucid' with friendly -y ending, implies clear thinking, pronounceable"}
 ]
+QUALITY CHECK - Each domain must:
 
-CONSTRAINTS:
-- All domains under 17 characters (before extension)
-- No hyphens, numbers, special characters
-- Prioritize .com (3.8x more likely to be typed)
-- Ensure voice search compatibility
-- Consider mobile typing ease
+Feel fresh/unusual (would you be surprised it's available?)
+Be easily spelled after hearing once
+Have no exact matches on Google
+Avoid ALL banned patterns above
+Use creative construction methods
+
+CRITICAL REMINDERS:
+
+If it sounds like a typical startup name, reject it
+If two common words are just mashed together, reject it
+If it describes what the app does directly, reject it
+Lean toward domains that make people ask "what does that mean?"
+Better to be too creative than too generic
 
 Generate 10 domains following this exact framework.
-
-CRITICAL: Output ONLY the JSON array. No explanations, no markdown, no code blocks, no additional text.
-Start with [ and end with ]. Example:
-[{"domain":"example.com","extension":".com","reason":"reason here"}]`
+CRITICAL: Output ONLY the JSON array. No explanations, no markdown, no code blocks.
+Start with [ and end with ].`
 
     // Generate domain suggestions using AI
     let completion
@@ -402,7 +482,7 @@ Start with [ and end with ]. Example:
               `${processedQuery}\n\nREMEMBER: Follow ANY specific domain requirements mentioned above exactly as requested!`
           }
         ],
-        model: 'llama-3.1-8b-instant',
+        model: 'gemma2-9b-it',
         temperature: 0.3,
         max_tokens: 2000
       })
