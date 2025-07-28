@@ -63,6 +63,14 @@ This is a Next.js 15 SaaS template using the App Router with clear separation be
 - `STRIPE_SECRET_KEY` - Stripe secret key
 - Database connection handled by Supabase CLI
 
+## Supabase Integration
+
+**IMPORTANT**: Always use MCP (Model Context Protocol) tools for all Supabase database operations instead of direct SQL commands or CLI:
+- Use `mcp__supabase__*` tools for database operations
+- For schema changes, use `mcp__supabase__apply_migration` instead of `npx drizzle-kit push`
+- For data queries, use `mcp__supabase__execute_sql` for read operations
+- Check available MCP Supabase tools before performing any database action
+
 ## Git Workflow
 
 When making significant updates to the codebase:

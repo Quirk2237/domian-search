@@ -4,6 +4,8 @@ import Groq from 'groq-sdk'
 import { formatDomainName, POPULAR_EXTENSIONS, parseDomainInput } from '@/lib/domain-utils'
 import { getClientIp, checkRateLimit } from '@/lib/rate-limit'
 import { getCachedDomainAvailability, setCachedDomainAvailability, throttleRequest } from '@/lib/domain-cache'
+import { getActivePrompt, getActivePromptId } from '@/lib/prompts'
+import { getSessionId, trackDomainSearch, trackDomainSuggestions } from '@/lib/analytics'
 
 // Simple in-memory cache
 interface CacheEntry {
@@ -71,7 +73,7 @@ function scoreDomain(domain: string, extension: string, isExactMatch: boolean): 
 }
 
 // Generate domain variations using AI
-async function generateDomainVariations(baseDomain: string, groqApiKey: string, excludeDomains: string[] = []): Promise<string[]> {
+async function generateDomainVariations(baseDomain: string, groqApiKey: string, excludeDomains: string[] = [], domainPrompt?: string): Promise<string[]> {
   try {
     const groq = new Groq({ apiKey: groqApiKey })
     
@@ -79,7 +81,7 @@ async function generateDomainVariations(baseDomain: string, groqApiKey: string, 
       messages: [
         {
           role: 'system',
-          content: `You are a domain name expert. Generate creative domain variations for a single word by adding prefixes or suffixes.
+          content: domainPrompt || `You are a domain name expert. Generate creative domain variations for a single word by adding prefixes or suffixes.
 
 RULES:
 1. Generate exactly 15 variations
@@ -270,10 +272,27 @@ export async function POST(request: NextRequest) {
         extensionsToCheck = [extension, ...POPULAR_EXTENSIONS.filter(ext => ext !== extension)]
       }
       
-      // Start AI generation immediately in parallel (don't wait for exact match results)
+      // Get session ID from request headers
+      const sessionId = request.headers.get('x-session-id') || getSessionId()
+
+      // Fetch active prompt from database
+      let domainPrompt: string | undefined
+      let promptVersionId: string | undefined
       const groqApiKey = process.env.GROQ_API_KEY
+      
+      if (groqApiKey) {
+        try {
+          domainPrompt = await getActivePrompt('domain')
+          promptVersionId = await getActivePromptId('domain')
+        } catch (error) {
+          console.error('Error fetching domain prompt:', error)
+          // Continue without database prompt, use hardcoded fallback
+        }
+      }
+
+      // Start AI generation immediately in parallel (don't wait for exact match results)
       const aiVariationsPromise = groqApiKey 
-        ? generateDomainVariations(cleanBaseDomain, groqApiKey, [])
+        ? generateDomainVariations(cleanBaseDomain, groqApiKey, [], domainPrompt)
           .then(variations => {
             console.log(`Generated ${variations.length} AI variations for "${cleanBaseDomain}"`)
             return variations
@@ -364,7 +383,7 @@ export async function POST(request: NextRequest) {
         while (aiResults.length < targetResults && retryCount < maxRetries) {
           // Get variations (excluding already tried ones)
           const variations = retryCount === 0 ? aiVariations : 
-            await generateDomainVariations(cleanBaseDomain, groqApiKey, allTriedVariations)
+            await generateDomainVariations(cleanBaseDomain, groqApiKey, allTriedVariations, domainPrompt)
           
           if (variations.length === 0) break
           
@@ -471,6 +490,27 @@ export async function POST(request: NextRequest) {
         const scoreB = b.score || 0
         return scoreB - scoreA
       })
+
+      // Track the search and results
+      if (promptVersionId) {
+        try {
+          const searchId = await trackDomainSearch(sessionId, domain, 'domain', promptVersionId)
+          
+          // Track all checked domains with their positions
+          await trackDomainSuggestions(
+            searchId,
+            uniqueResults.map((result, index) => ({
+              domain: result.domain,
+              extension: result.extension,
+              available: result.available,
+              position: index + 1
+            }))
+          )
+        } catch (trackingError) {
+          console.error('Error tracking analytics:', trackingError)
+          // Don't fail the request if tracking fails
+        }
+      }
 
       // Cache the unique results 
       cache.set(cacheKey, { data: uniqueResults, timestamp: Date.now() })

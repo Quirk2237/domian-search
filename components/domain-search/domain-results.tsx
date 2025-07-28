@@ -3,6 +3,7 @@
 import { Check, X, ExternalLink } from 'lucide-react'
 import { EXTENSION_PRICES } from '@/lib/domain-utils'
 import { motion } from 'framer-motion'
+import { useCallback } from 'react'
 
 interface DomainResult {
   domain: string
@@ -40,6 +41,27 @@ export function DomainResults({ results }: DomainResultsProps) {
     if (a.suggested && !b.suggested) return 1
     return 0
   })
+
+  const trackClick = useCallback(async (domain: string) => {
+    try {
+      // Get session ID from localStorage
+      const sessionId = localStorage.getItem('domain_search_session')
+      if (!sessionId) return
+
+      await fetch('/api/analytics/track', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          domain,
+          sessionId
+        })
+      })
+    } catch (error) {
+      console.error('Error tracking click:', error)
+    }
+  }, [])
   
   return (
     <motion.div 
@@ -95,6 +117,7 @@ export function DomainResults({ results }: DomainResultsProps) {
                   rel="noopener noreferrer"
                   className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
                   aria-label={`Register ${result.domain}`}
+                  onClick={() => trackClick(result.domain)}
                 >
                   <ExternalLink className="h-5 w-5" />
                 </a>

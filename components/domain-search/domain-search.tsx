@@ -43,6 +43,19 @@ export function DomainSearch({ className, onQueryChange, onResultsChange }: Doma
   const [isAtBottom, setIsAtBottom] = useState(true)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
+  // Initialize session ID on mount
+  useEffect(() => {
+    if (typeof window !== 'undefined' && !localStorage.getItem('domain_search_session')) {
+      // Generate a UUID v4
+      const uuid = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+        const r = Math.random() * 16 | 0
+        const v = c === 'x' ? r : (r & 0x3 | 0x8)
+        return v.toString(16)
+      })
+      localStorage.setItem('domain_search_session', uuid)
+    }
+  }, [])
+
   // Function to extract meaningful content
   const getMeaningfulContent = (text: string): string => {
     // Common filler words to ignore
@@ -104,9 +117,13 @@ export function DomainSearch({ className, onQueryChange, onResultsChange }: Doma
 
       try {
         if (mode === 'domain') {
+          const sessionId = localStorage.getItem('domain_search_session')
           const response = await fetch('/api/domains/check', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 
+              'Content-Type': 'application/json',
+              'x-session-id': sessionId || ''
+            },
             body: JSON.stringify({ domain: trimmedQuery })
           })
           
@@ -119,9 +136,13 @@ export function DomainSearch({ className, onQueryChange, onResultsChange }: Doma
           setDomainResults(data.results)
           setSuggestionResults([])
         } else {
+          const sessionId = localStorage.getItem('domain_search_session')
           const response = await fetch('/api/domains/suggest', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 
+              'Content-Type': 'application/json',
+              'x-session-id': sessionId || ''
+            },
             body: JSON.stringify({ query: trimmedQuery })
           })
           

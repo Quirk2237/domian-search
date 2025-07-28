@@ -4,6 +4,8 @@ import axios, { AxiosError } from 'axios'
 import { formatDomainName } from '@/lib/domain-utils'
 import { getClientIp, checkRateLimit } from '@/lib/rate-limit'
 import { getCachedDomainAvailability, setCachedDomainAvailability, throttleRequest } from '@/lib/domain-cache'
+import { getActivePrompt, getActivePromptId } from '@/lib/prompts'
+import { getSessionId, trackDomainSearch, trackDomainSuggestions } from '@/lib/analytics'
 
 // Simple in-memory cache
 interface SuggestionResult {
@@ -466,160 +468,23 @@ export async function POST(request: NextRequest) {
     // Initialize Groq client
     const groq = new Groq({ apiKey: groqApiKey })
 
-    // Store the current prompt for evaluation
-    const currentPrompt = `You are an elite domain name strategist who creates domains worth $10,000+ that are still available to register.
+    // Get active prompt from database
+    let currentPrompt: string
+    let promptVersionId: string
+    try {
+      currentPrompt = await getActivePrompt('suggestion')
+      promptVersionId = await getActivePromptId('suggestion')
+    } catch (error) {
+      console.error('Error fetching prompt:', error)
+      return NextResponse.json(
+        { error: 'Configuration error. Please try again later.' },
+        { status: 500 }
+      )
+    }
 
-DOMAIN EXCELLENCE FRAMEWORK
-What Makes a Domain Valuable (in order):
-Brandability (26%) - Can it become a household name?
-Memorability - Will people remember it after hearing once?
-Pronounceability - Can it spread by word-of-mouth?
-Emotional Resonance - Does it evoke positive feelings?
-Growth Potential - Can it scale beyond initial use?
-The $10K+ Domain Formula:
-Length: 4-8 characters = premium, 9-12 = excellent, 13+ = declining value
-Sound: Starts with plosive (P,B,T,D,K,G) or smooth flow (L,M,N,R)
-Rhythm: 1-3 syllables with natural stress patterns
-Meaning: Either purely abstract OR metaphorically perfect
-Typing: No ambiguous letters (l/I, 0/O), easy on mobile
-ADVANCED NAMING TECHNIQUES
-1. THE PERFECT DESCRIPTION METHOD (25%)
-Sometimes the best domain simply says what it does:
+    // Get session ID from request headers
+    const sessionId = request.headers.get('x-session-id') || getSessionId()
 
-InstantDomainSearch.com - immediately clear purpose
-HotelTonight.com - book hotels for tonight
-RentTheRunway.com - rent designer clothes
-StitchFix.com - fixes your wardrobe
-When to use: When the descriptive domain IS the brand differentiator Key: Must be short enough to type and memorable despite being descriptive
-
-2. THE METAPHOR METHOD (25%)
-Find unexpected parallels to the app's purpose:
-
-Uber (transportation) = "above/beyond" in German
-Amazon (bookstore) = massive river/jungle
-Apple (computers) = simple, approachable fruit
-For your app, think: What represents "finding/discovering" without saying it?
-
-3. THE SOUND SYMBOLISM METHOD (20%)
-Use phonemes that psychologically match the brand:
-
-Sharp sounds (K,T,P) = precision, technology
-Smooth sounds (L,M,S) = flow, ease
-Open vowels (A,O) = expansive, welcoming
-4. THE PORTMANTEAU PLUS METHOD (20%)
-Blend words but make it non-obvious:
-
-Groupon = Group + Coupon (obvious but works)
-Pinterest = Pin + Interest (clever blend)
-Microsoft = Microcomputer + Software (dated but worked)
-Better: Blend partial words or sounds, not full words
-
-5. THE LINGUISTIC INVENTION METHOD (10%)
-Create words that follow language rules but don't exist:
-
-Spotify: Spot + -ify (verb-making suffix)
-Shopify: Shop + -ify
-Kodak: Completely invented but follows English phonotactics
-AVAILABILITY STRATEGIES (Without Sacrificing Quality)
-The Sweet Spot Rules:
-One letter off from common: Change ONE letter in familiar words
-Lyft (Lift), Flickr (Flicker), Tumblr (Tumbler)
-Unexpected combinations: Pair words that rarely meet
-Face + Book = Facebook (who would have thought?)
-Snap + Chat = Snapchat (verb + verb unusual)
-Foreign language mining: Use non-English words
-Vevo (Latin: "I live")
-Hulu (Mandarin: "precious things")
-Nokia (Finnish river)
-Invented but linguistic: Follow phonological rules
-Xerox, Kodak, Exxon (feel like words but aren't)
-CATEGORY-SPECIFIC STRATEGIES
-For "AI-powered domain tool", you have two paths:
-
-Path A: Descriptive Excellence
-
-NameCheckAI.com, DomainFinderPro.com, InstantNameSearch.com
-Clear function + benefit (instant, check, find)
-Under 20 characters total for memorability
-Path B: Abstract Brand
-
-Discovery metaphors (compass, map, guide - but abstracted)
-Creation metaphors (forge, craft, build - but transformed)
-Vision metaphors (lens, prism, scope - but modified)
-Sound Patterns for Both:
-
-Technical precision: hard consonants (K,T,X,Z)
-Innovation: rising intonation (end with -a, -o)
-Reliability: balanced syllables
-THE MULTI-TIER APPROACH
-Tier 1: Premium Options (Mix of both types)
-Create 4 domains that could sell for $50K+:
-
-2 Perfect descriptive domains (InstantDomainSearch style)
-2 Premium brandables (Stripe, Canva style)
-Tier 2: Excellent Niche Brands
-Create 4 domains worth $5-10K in your specific niche:
-
-Clear connection to purpose
-Mix of descriptive and abstract
-Growth potential
-Tier 3: Solid Starters
-Create 2 domains that are immediately usable:
-
-Good enough to build on
-Available with common TLDs
-Won't limit future growth
-QUALITY FILTERS
-Each domain must pass:
-
-The Starbucks Test: Could this be a global brand?
-The Radio Test: Can you spell it from hearing it?
-The Investor Test: Would someone pay 100x registration for it?
-The Mom Test: Can your mom remember and spell it?
-The Global Test: Works across cultures?
-AVOID THESE AVAILABILITY KILLERS
-Single dictionary words (unless truly unique angle)
-Overly generic descriptions (BestDomains, GreatNames)
-Trendy prefixes (Get-, My-, The-, i-) without purpose
-Trendy suffixes (-ly, -ify, -hub, -lab) unless they add meaning
-Category + Tech/AI/Pro/Plus (unless it truly fits)
-OUTPUT REQUIREMENTS
-Generate 10 domains with this distribution:
-
-6 .com domains (require maximum creativity)
-2 .io domains (tech-focused options)
-1 .app domain (if mobile-relevant)
-1 .ai domain (only if NOT AI-descriptive)
-For each domain explain:
-
-The creation method used
-Why it's memorable/valuable
-The emotional/conceptual connection
-EXAMPLES OF EXCELLENCE + AVAILABILITY
-Great DESCRIPTIVE domains:
-
-InstantDomainSearch.com (domain tool - perfect clarity)
-ConvertKit.com (email marketing - action + result)
-MailChimp.com (email - function + memorable mascot)
-QuickBooks.com (accounting - speed + function)
-Great BRANDABLE domains:
-
-Notion.so (note-taking app, clean concept)
-Stripe.com (payment processing, simple metaphor)
-Canva.com (design tool, modified "canvas")
-Asana.com (project management, yoga term)
-Notice: Both types can build billion-dollar companies.
-
-OUTPUT FORMAT
-json
-
-[
-  {"domain":"nexvo.com","extension":".com","reason":"Portmanteau of 'next' + 'evolve', strong X sound for tech, implies progress without describing function"},
-  {"domain":"zephyr.io","extension":".io","reason":"Real word (west wind) as metaphor for swift discovery, premium single word, memorable"}
-]
-Generate 10 exceptional domains that balance high value potential with realistic availability.
-
-OUTPUT ONLY THE JSON ARRAY. Start with [ and end with ].`
 
     // Generate domain suggestions using AI
     let completion
@@ -867,6 +732,25 @@ OUTPUT ONLY THE JSON ARRAY. Start with [ and end with ].`
           console.error('Error during domain evaluation:', evalError)
           // Don't fail the request if evaluation fails
         }
+      }
+
+      // Track the search and suggestions
+      try {
+        const searchId = await trackDomainSearch(sessionId, query, 'suggestion', promptVersionId)
+        
+        // Track all suggestions with their positions
+        await trackDomainSuggestions(
+          searchId,
+          finalDomains.map((domain, index) => ({
+            domain: domain.domain,
+            extension: domain.extension || '.com',
+            available: domain.available,
+            position: index + 1
+          }))
+        )
+      } catch (trackingError) {
+        console.error('Error tracking analytics:', trackingError)
+        // Don't fail the request if tracking fails
       }
 
       // Cache the results
