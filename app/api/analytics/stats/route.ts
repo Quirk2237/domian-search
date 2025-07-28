@@ -68,23 +68,34 @@ export async function GET(request: NextRequest) {
 
     if (recentError) throw recentError
 
-    // Get top clicked domains
-    const { data: topDomains, error: topError } = await supabase
+    // Get clicked domains with their details
+    const { data: clickedDomains, error: topError } = await supabase
       .from('domain_clicks')
-      .select(`
-        suggestion_id,
-        domain_suggestions!inner(domain, extension)
-      `)
-      .limit(10)
+      .select('suggestion_id')
+      .limit(100)
 
     if (topError) throw topError
 
-    // Process top domains to count clicks
+    // Get unique suggestion IDs
+    const suggestionIds = [...new Set(clickedDomains?.map(c => c.suggestion_id) || [])]
+
+    // Get domain details for these suggestions
+    const { data: domainDetails, error: detailsError } = await supabase
+      .from('domain_suggestions')
+      .select('id, domain, extension')
+      .in('id', suggestionIds)
+
+    if (detailsError) throw detailsError
+
+    // Count clicks per domain
     const domainClickCounts = new Map<string, number>()
-    topDomains?.forEach((click: any) => {
-      const domain = click.domain_suggestions?.domain
-      if (domain) {
-        domainClickCounts.set(domain, (domainClickCounts.get(domain) || 0) + 1)
+    clickedDomains?.forEach(click => {
+      const domainInfo = domainDetails?.find(d => d.id === click.suggestion_id)
+      if (domainInfo?.domain) {
+        domainClickCounts.set(
+          domainInfo.domain,
+          (domainClickCounts.get(domainInfo.domain) || 0) + 1
+        )
       }
     })
 
