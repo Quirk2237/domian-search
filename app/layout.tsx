@@ -61,8 +61,8 @@ const geistMono = localFont({
 })
 
 export const metadata: Metadata = {
-  title: "Mckay's App Template",
-  description: "The easiest way to start your next project."
+  title: "Wicked Simple Domains",
+  description: "Find your perfect domain name with ease."
 }
 
 export const viewport = {

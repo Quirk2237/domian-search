@@ -62,3 +62,14 @@ This is a Next.js 15 SaaS template using the App Router with clear separation be
 - `CLERK_SECRET_KEY` - Clerk secret key
 - `STRIPE_SECRET_KEY` - Stripe secret key
 - Database connection handled by Supabase CLI
+
+## Git Workflow
+
+When making significant updates to the codebase:
+1. After completing a feature or fixing bugs, commit changes with a descriptive message
+2. Push changes to the remote repository to keep it in sync
+3. Use conventional commit messages (e.g., "feat:", "fix:", "docs:", "refactor:")
+4. Example workflow:
+   - `git add .` - Stage all changes
+   - `git commit -m "feat: add domain search functionality"` - Commit with message
+   - `git push origin main` - Push to remote repository
