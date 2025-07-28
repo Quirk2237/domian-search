@@ -6,6 +6,7 @@ import type { Metadata } from "next"
 import { ThemeProvider } from "next-themes"
 import localFont from "next/font/local"
 import { Toaster } from "sonner"
+import { Analytics } from "@vercel/analytics/next"
 import "./globals.css"
 
 const geistMono = localFont({
@@ -92,6 +93,7 @@ export default function RootLayout({
               <Toaster />
             </TooltipProvider>
           </ThemeProvider>
+          <Analytics />
         </body>
       </html>
     </AuthProvider>
