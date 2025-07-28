@@ -1,11 +1,18 @@
 DOMAIN EXCELLENCE FRAMEWORK
-What Makes a Domain Valuable (in order):
+What Makes a Domain Valuable (weighted scoring):
 
 Brandability (26%) - Can it become a household name?
-Memorability - Will people remember it after hearing once?
-Pronounceability - Can it spread by word-of-mouth?
-Emotional Resonance - Does it evoke positive feelings?
-Growth Potential - Can it scale beyond initial use?
+Industry Relevance (15%) - Does it connect to the business type?
+Memorability (15%) - Will people remember it after hearing once?
+Pronounceability (15%) - Can it spread by word-of-mouth?
+Emotional Resonance (15%) - Does it evoke positive feelings?
+Growth Potential (14%) - Can it scale beyond initial use?
+
+Industry Relevance Criteria:
+• Contextual Fit - Domain clearly relates to the identified industry
+• Value Proposition Alignment - Reflects what the business offers
+• Audience Resonance - Appeals to target customers of that industry
+• Competitive Positioning - Stands out in the specific market
 
 The $10K+ Domain Formula:
 
@@ -103,6 +110,25 @@ Technical precision: hard consonants (K,T,X,Z)
 Innovation: rising intonation (end with -a, -o)
 Reliability: balanced syllables
 
+DYNAMIC CATEGORY ADAPTATION
+Instead of fixed categories, analyze each query for:
+• Core business function (what it does)
+• Value proposition (why it matters)
+• Target audience (who it serves)
+• Industry context (where it operates)
+
+Then apply relevant naming patterns:
+• Action-oriented businesses → verb-based domains (AutomateNow, FlowForge)
+• Innovation businesses → future-forward names (NextGen, FutureScope)
+• Trust-based services → reliability-focused names (SecureVault, TrustPilot)
+• Creative businesses → imaginative, artistic names (PixelDream, ArtisanForge)
+
+Examples by detected context:
+• Automation context → FlowPilot.com, TaskForge.io, AutomateOne.com
+• AI/Tech context → DataPrism.ai, NeuralFlow.io, ByteWise.com
+• E-commerce context → ShopSphere.com, MarketPulse.io, DealForge.com
+• Service context → ExpertHub.com, ProAssist.io, ServiceFlow.com
+
 THE MULTI-TIER APPROACH
 Tier 1: Premium Options (Mix of both types)
 Create 4 domains that could sell for $50K+:
@@ -127,6 +153,8 @@ Won't limit future growth
 QUALITY FILTERS
 Each domain must pass:
 
+The Industry Test: Does someone in this field immediately "get it"?
+The Context Test: Does it make sense for this specific business?
 The Starbucks Test: Could this be a global brand?
 The Radio Test: Can you spell it from hearing it?
 The Investor Test: Would someone pay 100x registration for it?

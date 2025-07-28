@@ -8,8 +8,8 @@ import { Progress } from '@/components/ui/progress'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
-import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet'
-import { Search, MousePointerClick, Globe, TrendingUp, Clock, ArrowRight } from 'lucide-react'
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Search, MousePointerClick, Globe, TrendingUp, Clock } from 'lucide-react'
 import { useSpring, animated } from '@react-spring/web'
 
 interface StatsData {
@@ -224,10 +224,6 @@ export default function StatsPage() {
                   <p className="text-xs text-muted-foreground">
                     {stats.recentSearches} in last 24h
                   </p>
-                  <div className="flex items-center gap-1 mt-2 text-xs text-muted-foreground">
-                    <span>View history</span>
-                    <ArrowRight className="h-3 w-3" />
-                  </div>
                 </CardContent>
               </Card>
             </motion.div>
@@ -435,15 +431,15 @@ export default function StatsPage() {
         </TabsContent>
       </Tabs>
 
-      {/* Search History Sheet */}
-      <Sheet open={searchHistoryOpen} onOpenChange={setSearchHistoryOpen}>
-        <SheetContent className="w-full sm:max-w-lg">
-          <SheetHeader>
-            <SheetTitle>Search History</SheetTitle>
-            <SheetDescription>
+      {/* Search History Dialog */}
+      <Dialog open={searchHistoryOpen} onOpenChange={setSearchHistoryOpen}>
+        <DialogContent className="sm:max-w-[600px] max-h-[80vh]">
+          <DialogHeader>
+            <DialogTitle>Search History</DialogTitle>
+            <DialogDescription>
               Recent domain searches
-            </SheetDescription>
-          </SheetHeader>
+            </DialogDescription>
+          </DialogHeader>
           
           <div className="mt-6 space-y-4 max-h-[calc(100vh-200px)] overflow-y-auto">
             {searchHistoryLoading ? (
@@ -496,8 +492,8 @@ export default function StatsPage() {
               </div>
             )}
           </div>
-        </SheetContent>
-      </Sheet>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
