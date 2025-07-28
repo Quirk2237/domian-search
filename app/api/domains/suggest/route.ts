@@ -31,9 +31,9 @@ let apiDisabledUntil = 0
 async function generateMoreSuggestions(
   query: string, 
   existingDomains: string[], 
+  basePrompt: string,
   groqApiKey?: string,
-  retryCount: number = 0,
-  basePrompt: string
+  retryCount: number = 0
 ): Promise<Array<{ domain: string; extension?: string; reason?: string }>> {
   console.log(`Generating more suggestions for retry ${retryCount}. Original query:`, query)
   
@@ -444,7 +444,7 @@ export async function POST(request: NextRequest) {
         
         // Get current batch of domains to check
         const currentBatch = retryCount === 0 ? suggestedDomains : 
-          await generateMoreSuggestions(processedQuery, allSuggestedDomains, groqApiKey, retryCount, currentPrompt)
+          await generateMoreSuggestions(processedQuery, allSuggestedDomains, currentPrompt, groqApiKey, retryCount)
         
         console.log(`${retryCount === 0 ? 'Checking' : `Retry ${retryCount}:`} ${currentBatch.length} domains in parallel...`)
         
