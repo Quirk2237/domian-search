@@ -1,162 +1,173 @@
-# Domain Quality Checklist
+DOMAIN EXCELLENCE FRAMEWORK
+What Makes a Domain Valuable (in order):
 
-This document defines our criteria for excellent domain names. It serves as the source of truth for evaluating domain suggestions and is used by our AI evaluation system to improve suggestion quality over time.
+Brandability (26%) - Can it become a household name?
+Memorability - Will people remember it after hearing once?
+Pronounceability - Can it spread by word-of-mouth?
+Emotional Resonance - Does it evoke positive feelings?
+Growth Potential - Can it scale beyond initial use?
 
-## Core Requirements (Must Have)
+The $10K+ Domain Formula:
 
-### 1. Length ✓
-- **Ideal**: 4-10 characters (before TLD)
-- **Acceptable**: 11-12 characters if highly brandable
-- **Avoid**: 13+ characters (too long for memorability)
+Length: 4-8 characters = premium, 9-12 = excellent, 13+ = declining value
+Sound: Starts with plosive (P,B,T,D,K,G) or smooth flow (L,M,N,R)
+Rhythm: 1-3 syllables with natural stress patterns
+Meaning: Either purely abstract OR metaphorically perfect
+Typing: No ambiguous letters (l/I, 0/O), easy on mobile
 
-### 2. Spelling & Pronunciation ✓
-- Must pass the "radio test" (clear when spoken aloud)
-- No ambiguous spellings (e.g., "4" vs "for", "u" vs "you")
-- Avoid consecutive vowels or consonants that are hard to pronounce
-- International friendly (works across languages/accents)
+ADVANCED NAMING TECHNIQUES
+1. THE PERFECT DESCRIPTION METHOD (25%)
+Sometimes the best domain simply says what it does:
 
-### 3. Technical Requirements ✓
-- No hyphens or underscores
-- No numbers (unless integral to brand like "23andme")
-- Starts with a letter (better for social media handles)
-- No special characters
+InstantDomainSearch.com - immediately clear purpose
+HotelTonight.com - book hotels for tonight
+RentTheRunway.com - rent designer clothes
+StitchFix.com - fixes your wardrobe
 
-### 4. Availability ✓
-- Must be available for registration
-- Consider trademark conflicts for common terms
+When to use: When the descriptive domain IS the brand differentiator
+Key: Must be short enough to type and memorable despite being descriptive
+2. THE METAPHOR METHOD (25%)
+Find unexpected parallels to the app's purpose:
 
-## Highly Desirable Features
+Uber (transportation) = "above/beyond" in German
+Amazon (bookstore) = massive river/jungle
+Apple (computers) = simple, approachable fruit
 
-### 5. TLD Strategy
-- **.com** strongly preferred (3.8x more likely to be typed directly)
-- Alternative TLDs acceptable if:
-  - Perfect keyword match (.ai for AI companies)
-  - Short and memorable (.io for tech)
-  - Brand enhancing (.app for applications)
-- **Avoid**: Obscure TLDs unless exceptional fit
+For your app, think: What represents "finding/discovering" without saying it?
+3. THE SOUND SYMBOLISM METHOD (20%)
+Use phonemes that psychologically match the brand:
 
-### 6. Brandability Score
-- **Memorable**: Sticks in mind after one hearing
-- **Unique**: Distinguishable from competitors
-- **Emotional**: Evokes positive feelings or associations
-- **Flexible**: Can grow beyond initial use case
+Sharp sounds (K,T,P) = precision, technology
+Smooth sounds (L,M,S) = flow, ease
+Open vowels (A,O) = expansive, welcoming
 
-### 7. Typing Ease
-- Easy on mobile keyboards (avoid alternating hands excessively)
-- Natural finger flow on QWERTY
-- Minimal typo potential
-- Common letter combinations
+4. THE PORTMANTEAU PLUS METHOD (20%)
+Blend words but make it non-obvious:
 
-## Bonus Criteria
+Groupon = Group + Coupon (obvious but works)
+Pinterest = Pin + Interest (clever blend)
+Microsoft = Microcomputer + Software (dated but worked)
 
-### 8. Linguistic Features
-- Alliteration (BestBuy, PayPal)
-- Assonance/rhythm (Google, Uber)
-- Plosive sounds (P, B, T, D, K, G) for impact
-- Avoid: Soft sounds only (too forgettable)
+Better: Blend partial words or sounds, not full words
+5. THE LINGUISTIC INVENTION METHOD (10%)
+Create words that follow language rules but don't exist:
 
-### 9. Future-Proofing
-- Won't sound dated in 5-10 years
-- Broad enough for business pivots
-- Not tied to temporary trends
-- Scalable (works for small and large company)
+Spotify: Spot + -ify (verb-making suffix)
+Shopify: Shop + -ify
+Kodak: Completely invented but follows English phonotactics
 
-### 10. Marketing Advantages
-- SEO potential (but not over-optimized)
-- Social media handle availability
-- Visual balance (looks good in logos)
-- Story potential (interesting origin/meaning)
+AVAILABILITY STRATEGIES (Without Sacrificing Quality)
+The Sweet Spot Rules:
 
-## Domain Categories (By Quality)
+One letter off from common: Change ONE letter in familiar words
 
-### Tier 1: Premium Domains (Score 9-10)
-- Single dictionary words: voice.com, spark.com
-- Perfect invented words: Google, Kodak, Xerox
-- Two-letter/three-letter .com domains
-- Category-defining terms
+Lyft (Lift), Flickr (Flicker), Tumblr (Tumbler)
 
-### Tier 2: Excellent Domains (Score 7-8)
-- Strong compound words: Facebook, Snapchat, Airbnb
-- Quality invented words: Spotify, Canva, Asana
-- Perfect alternative TLD matches: genius.ai, photos.app
-- Short brandable phrases: mint.com, buffer.com
 
-### Tier 3: Good Domains (Score 5-6)
-- Longer compounds: DigitalOcean, MailChimp
-- Modified words: Lyft, Tumblr, Flickr
-- Good alternative TLDs: notion.so, bit.ly
-- Descriptive but memorable: zoom.us, slack.com
+Unexpected combinations: Pair words that rarely meet
 
-### Tier 4: Acceptable Domains (Score 3-4)
-- Three-word combinations
-- Long but clear: salesforce.com
-- Non-.com with good reason
-- Industry-specific terms
+Face + Book = Facebook (who would have thought?)
+Snap + Chat = Snapchat (verb + verb unusual)
 
-## Red Flags to Avoid
 
-1. **Generic descriptors**: bestrecipeapp.com, airecipetool.com
-2. **Trend-chasing**: web3recipes.com, cryptofood.io
-3. **Hard to spell**: rhythmn.com, phyre.com
-4. **Confusing**: to/too/two, for/four/4
-5. **Limiting**: sanfranciscorecipes.com (too specific)
-6. **Trademark risks**: microsoftrecipes.com
+Foreign language mining: Use non-English words
 
-## Context Considerations
+Vevo (Latin: "I live")
+Hulu (Mandarin: "precious things")
+Nokia (Finnish river)
 
-### Availability Reality
-- Perfect domains are often taken
-- "Best available" is acceptable with explanation
-- Document why compromises were made
-- Track unavailable domains that would have scored higher
 
-### Industry Factors
-- B2B can be more descriptive
-- B2C needs more brandability
-- Technical audiences accept .io/.dev
-- Consumer brands need .com
+Invented but linguistic: Follow phonological rules
 
-### Use Case Alignment
-- Startup: Needs brandable, memorable
-- Local business: Can include location
-- Personal project: More flexibility
-- Enterprise: Professional, trustworthy
+Xerox, Kodak, Exxon (feel like words but aren't)
 
-## Evaluation Weights
 
-When scoring domains, weight criteria as follows:
-1. **Availability** (Required - pass/fail)
-2. **Length** (20%)
-3. **Brandability** (25%)
-4. **TLD** (20%)
-5. **Spelling/Pronunciation** (15%)
-6. **Typing ease** (10%)
-7. **Future-proofing** (10%)
 
-## Examples Analysis
+CATEGORY-SPECIFIC STRATEGIES
+For "AI-powered domain tool", you have two paths:
+Path A: Descriptive Excellence
 
-### Excellent Examples (9-10/10)
-- **Zoom** - 4 letters, memorable, became a verb, .us works
-- **Stripe** - Single word, payment association, strong consonants
-- **Notion** - Real word, flexible meaning, .so enhances brand
+NameCheckAI.com, DomainFinderPro.com, InstantNameSearch.com
+Clear function + benefit (instant, check, find)
+Under 20 characters total for memorability
 
-### Good Examples (7-8/10)
-- **Airbnb** - Compound but memorable, tells story
-- **Spotify** - Invented but pronounceable, music feel
-- **Dropbox** - Descriptive but short, functional
+Path B: Abstract Brand
 
-### Poor Examples (2-4/10)
-- **cheap-web-hosting-solutions.com** - Too long, hyphens, generic
-- **recipe4u.net** - Number substitution, dated feel
-- **aifoodrecipegenerator.com** - Too descriptive, no brand potential
+Discovery metaphors (compass, map, guide - but abstracted)
+Creation metaphors (forge, craft, build - but transformed)
+Vision metaphors (lens, prism, scope - but modified)
 
-## Living Document Note
+Sound Patterns for Both:
 
-This checklist evolves based on:
-- Market trends and user behavior
-- Success patterns from launched domains
-- Availability constraints in different sectors
-- Emerging TLD acceptance rates
+Technical precision: hard consonants (K,T,X,Z)
+Innovation: rising intonation (end with -a, -o)
+Reliability: balanced syllables
 
-Last updated: [Current Date]
-Next review: [Quarterly]
+THE MULTI-TIER APPROACH
+Tier 1: Premium Options (Mix of both types)
+Create 4 domains that could sell for $50K+:
+
+2 Perfect descriptive domains (InstantDomainSearch style)
+2 Premium brandables (Stripe, Canva style)
+
+Tier 2: Excellent Niche Brands
+Create 4 domains worth $5-10K in your specific niche:
+
+Clear connection to purpose
+Mix of descriptive and abstract
+Growth potential
+
+Tier 3: Solid Starters
+Create 2 domains that are immediately usable:
+
+Good enough to build on
+Available with common TLDs
+Won't limit future growth
+
+QUALITY FILTERS
+Each domain must pass:
+
+The Starbucks Test: Could this be a global brand?
+The Radio Test: Can you spell it from hearing it?
+The Investor Test: Would someone pay 100x registration for it?
+The Mom Test: Can your mom remember and spell it?
+The Global Test: Works across cultures?
+
+AVOID THESE AVAILABILITY KILLERS
+
+Single dictionary words (unless truly unique angle)
+Overly generic descriptions (BestDomains, GreatNames)
+Trendy prefixes (Get-, My-, The-, i-) without purpose
+Trendy suffixes (-ly, -ify, -hub, -lab) unless they add meaning
+Category + Tech/AI/Pro/Plus (unless it truly fits)
+
+OUTPUT REQUIREMENTS
+Generate 10 domains with this distribution:
+
+6 .com domains (require maximum creativity)
+2 .io domains (tech-focused options)
+1 .app domain (if mobile-relevant)
+1 .ai domain (only if NOT AI-descriptive)
+
+For each domain explain:
+
+The creation method used
+Why it's memorable/valuable
+The emotional/conceptual connection
+
+EXAMPLES OF EXCELLENCE + AVAILABILITY
+Great DESCRIPTIVE domains:
+
+InstantDomainSearch.com (domain tool - perfect clarity)
+ConvertKit.com (email marketing - action + result)
+MailChimp.com (email - function + memorable mascot)
+QuickBooks.com (accounting - speed + function)
+
+Great BRANDABLE domains:
+
+Notion.so (note-taking app, clean concept)
+Stripe.com (payment processing, simple metaphor)
+Canva.com (design tool, modified "canvas")
+Asana.com (project management, yoga term)
+
+Notice: Both types can build billion-dollar companies.

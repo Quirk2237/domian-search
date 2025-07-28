@@ -8,7 +8,8 @@ import { Progress } from '@/components/ui/progress'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
-import { Search, MousePointerClick, Globe, TrendingUp } from 'lucide-react'
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet'
+import { Search, MousePointerClick, Globe, TrendingUp, Clock, ArrowRight } from 'lucide-react'
 import { useSpring, animated } from '@react-spring/web'
 
 interface StatsData {
@@ -26,6 +27,23 @@ interface StatsData {
     domain: string
     clicks: number
   }>
+}
+
+interface SearchHistoryItem {
+  id: string
+  query: string
+  search_mode: 'domain' | 'suggestion'
+  created_at: string
+}
+
+interface SearchHistoryResponse {
+  searches: SearchHistoryItem[]
+  pagination: {
+    page: number
+    limit: number
+    total: number
+    totalPages: number
+  }
 }
 
 // Animated counter component
@@ -71,6 +89,10 @@ export default function StatsPage() {
   const [stats, setStats] = useState<StatsData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [searchHistoryOpen, setSearchHistoryOpen] = useState(false)
+  const [searchHistory, setSearchHistory] = useState<SearchHistoryItem[]>([])
+  const [searchHistoryLoading, setSearchHistoryLoading] = useState(false)
+  const [searchHistoryError, setSearchHistoryError] = useState<string | null>(null)
 
   useEffect(() => {
     fetchStats()
@@ -87,6 +109,44 @@ export default function StatsPage() {
     } finally {
       setLoading(false)
     }
+  }
+
+  const fetchSearchHistory = async () => {
+    setSearchHistoryLoading(true)
+    setSearchHistoryError(null)
+    try {
+      const response = await fetch('/api/analytics/searches?limit=50')
+      if (!response.ok) throw new Error('Failed to fetch search history')
+      const data: SearchHistoryResponse = await response.json()
+      setSearchHistory(data.searches)
+    } catch (err) {
+      setSearchHistoryError(err instanceof Error ? err.message : 'Failed to load search history')
+    } finally {
+      setSearchHistoryLoading(false)
+    }
+  }
+
+  const handleTotalSearchesClick = () => {
+    setSearchHistoryOpen(true)
+    if (searchHistory.length === 0 && !searchHistoryLoading) {
+      fetchSearchHistory()
+    }
+  }
+
+  const formatRelativeTime = (dateString: string) => {
+    const date = new Date(dateString)
+    const now = new Date()
+    const diffMs = now.getTime() - date.getTime()
+    const diffMins = Math.floor(diffMs / 60000)
+    const diffHours = Math.floor(diffMs / 3600000)
+    const diffDays = Math.floor(diffMs / 86400000)
+
+    if (diffMins < 1) return 'Just now'
+    if (diffMins < 60) return `${diffMins} min${diffMins > 1 ? 's' : ''} ago`
+    if (diffHours < 24) return `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`
+    if (diffDays < 7) return `${diffDays} day${diffDays > 1 ? 's' : ''} ago`
+    
+    return date.toLocaleDateString()
   }
 
   if (loading) {
@@ -147,7 +207,10 @@ export default function StatsPage() {
             animate="visible"
           >
             <motion.div variants={cardVariants}>
-              <Card>
+              <Card 
+                className="cursor-pointer hover:bg-muted/50 transition-colors"
+                onClick={handleTotalSearchesClick}
+              >
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                   <CardTitle className="text-sm font-medium">
                     Total Searches
@@ -161,6 +224,10 @@ export default function StatsPage() {
                   <p className="text-xs text-muted-foreground">
                     {stats.recentSearches} in last 24h
                   </p>
+                  <div className="flex items-center gap-1 mt-2 text-xs text-muted-foreground">
+                    <span>View history</span>
+                    <ArrowRight className="h-3 w-3" />
+                  </div>
                 </CardContent>
               </Card>
             </motion.div>
@@ -367,6 +434,70 @@ export default function StatsPage() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* Search History Sheet */}
+      <Sheet open={searchHistoryOpen} onOpenChange={setSearchHistoryOpen}>
+        <SheetContent className="w-full sm:max-w-lg">
+          <SheetHeader>
+            <SheetTitle>Search History</SheetTitle>
+            <SheetDescription>
+              Recent domain searches
+            </SheetDescription>
+          </SheetHeader>
+          
+          <div className="mt-6 space-y-4 max-h-[calc(100vh-200px)] overflow-y-auto">
+            {searchHistoryLoading ? (
+              <>
+                {[...Array(5)].map((_, i) => (
+                  <div key={i} className="space-y-2">
+                    <Skeleton className="h-4 w-3/4" />
+                    <Skeleton className="h-3 w-1/4" />
+                  </div>
+                ))}
+              </>
+            ) : searchHistoryError ? (
+              <div className="text-destructive text-sm">
+                {searchHistoryError}
+              </div>
+            ) : searchHistory.length === 0 ? (
+              <div className="text-muted-foreground text-sm">
+                No search history available
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {searchHistory.map((search) => (
+                  <motion.div
+                    key={search.id}
+                    initial={{ opacity: 0, x: -20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    className="p-3 rounded-lg border hover:bg-muted/50 transition-colors"
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-sm truncate">
+                          {search.query}
+                        </p>
+                        <div className="flex items-center gap-2 mt-1">
+                          <Badge 
+                            variant="outline" 
+                            className="text-xs"
+                          >
+                            {search.search_mode === 'domain' ? 'Domain Check' : 'AI Suggestions'}
+                          </Badge>
+                          <span className="text-xs text-muted-foreground flex items-center gap-1">
+                            <Clock className="h-3 w-3" />
+                            {formatRelativeTime(search.created_at)}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </motion.div>
+                ))}
+              </div>
+            )}
+          </div>
+        </SheetContent>
+      </Sheet>
     </div>
   )
 }

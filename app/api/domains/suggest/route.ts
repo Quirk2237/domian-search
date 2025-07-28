@@ -60,7 +60,19 @@ Focus on maximum creativity and availability - assume common words are taken.
     '\nFOCUS: Try .net, .org, .ai domains for remaining 40% while still ensuring 60% are .com' :
     '\nFOCUS: Be maximally creative with invented brandables, ensure 60% are .com domains'
 
-  const modifiedPrompt = retryPretext + basePrompt + extensionGuidance
+  // Add output format to retry prompt
+  const outputFormat = `
+
+OUTPUT FORMAT:
+Generate exactly 10 domains as a JSON array with this structure:
+[
+  {"domain":"example.com","extension":".com","reason":"Brief explanation"},
+  {"domain":"another.io","extension":".io","reason":"Why this domain works"}
+]
+
+IMPORTANT: Output ONLY the JSON array. Start with [ and end with ].`
+
+  const modifiedPrompt = retryPretext + basePrompt + extensionGuidance + outputFormat
 
   const completion = await groq.chat.completions.create({
     messages: [
@@ -346,6 +358,18 @@ export async function POST(request: NextRequest) {
     const sessionId = request.headers.get('x-session-id') || getSessionId()
 
 
+    // Append output format to the prompt
+    const fullPrompt = currentPrompt + `
+
+OUTPUT FORMAT:
+Generate exactly 10 domains as a JSON array with this structure:
+[
+  {"domain":"example.com","extension":".com","reason":"Brief explanation"},
+  {"domain":"another.io","extension":".io","reason":"Why this domain works"}
+]
+
+IMPORTANT: Output ONLY the JSON array. Start with [ and end with ].`
+
     // Generate domain suggestions using AI
     let completion
     try {
@@ -353,7 +377,7 @@ export async function POST(request: NextRequest) {
         messages: [
           {
             role: 'system',
-            content: currentPrompt
+            content: fullPrompt
           },
           {
             role: 'user',
