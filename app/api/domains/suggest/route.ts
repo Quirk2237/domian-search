@@ -29,7 +29,8 @@ let apiDisabledUntil = 0
 async function generateMoreSuggestions(
   query: string, 
   existingDomains: string[], 
-  groqApiKey?: string
+  groqApiKey?: string,
+  retryCount: number = 0
 ): Promise<Array<{ domain: string; extension?: string; reason?: string }>> {
   if (!groqApiKey) {
     // Return empty array if no API key
@@ -37,6 +38,11 @@ async function generateMoreSuggestions(
   }
 
   const groq = new Groq({ apiKey: groqApiKey })
+  
+  // Adjust extensions based on retry count
+  const extensionFocus = retryCount === 0 ? 'Focus on .com domains' :
+                        retryCount === 1 ? 'Focus on .io, .co, and .app domains' :
+                        'Focus on .net, .org, and .ai domains'
   
   const completion = await groq.chat.completions.create({
     messages: [
@@ -79,6 +85,8 @@ CONSTRAINTS:
 
 IMPORTANT: Avoid these already suggested domains: ${existingDomains.join(', ')}
 Create completely different alternatives.
+
+RETRY INSTRUCTION: ${extensionFocus}
 
 Generate 10 domains following this exact framework. Output ONLY the JSON array.`
       },
@@ -431,8 +439,8 @@ Generate 10 domains following this exact framework. Output ONLY the JSON array.`
       const allSuggestedDomains: string[] = []
       const availableDomains: SuggestionResult[] = []
       let retryCount = 0
-      const maxRetries = 1 // Reduced from 3 to avoid rate limits
-      const targetAvailableDomains = 3 // Reduced from 5 to minimize API calls
+      const maxRetries = 3 // Match domain mode for better results
+      const targetAvailableDomains = 5 // Match domain mode target
       
       // Keep trying until we have enough available domains or hit max retries
       while (availableDomains.length < targetAvailableDomains && retryCount < maxRetries) {
@@ -440,79 +448,78 @@ Generate 10 domains following this exact framework. Output ONLY the JSON array.`
         
         // Get current batch of domains to check
         const currentBatch = retryCount === 0 ? suggestedDomains : 
-          await generateMoreSuggestions(processedQuery, allSuggestedDomains, groqApiKey)
+          await generateMoreSuggestions(processedQuery, allSuggestedDomains, groqApiKey, retryCount)
         
-        // Check availability for each suggested domain (reduced batch size)
-        const batchSize = 5 // Reduced from 10
-        const suggestionsToCheck = currentBatch.slice(0, batchSize)
+        console.log(`${retryCount === 0 ? 'Checking' : `Retry ${retryCount}:`} ${currentBatch.length} domains in parallel...`)
         
-        // Process domains sequentially with delay to avoid rate limits
-        const suggestionsWithAvailability = []
-        for (const suggestion of suggestionsToCheck) {
-          // Ensure domain includes extension if not already present
-          let fullDomain = suggestion.domain
-          if (!fullDomain.includes('.') && suggestion.extension) {
-            // Remove extension from domain if it's been incorrectly appended without dot
-            const extensionWithoutDot = suggestion.extension.substring(1)
-            if (fullDomain.endsWith(extensionWithoutDot)) {
-              fullDomain = fullDomain.slice(0, -extensionWithoutDot.length) + suggestion.extension
-            } else {
-              fullDomain = fullDomain + suggestion.extension
-            }
-          }
-          
-          const cleanDomain = formatDomainName(fullDomain)
-          console.log(`Checking domain: original="${suggestion.domain}", extension="${suggestion.extension}", full="${fullDomain}", clean="${cleanDomain}"`)
-          
-          try {
-            const available = await checkDomainAvailability(cleanDomain, domainrApiKey)
+        // Process domains in parallel for better performance
+        const suggestionsWithAvailability = await Promise.all(
+          currentBatch.map(async (suggestion: { domain: string; extension?: string; reason?: string }) => {
+            // Smart extension rotation based on retry count
+            let fullDomain = suggestion.domain
             
-            // Log the result
-            if (available) {
-              console.log(`✓ Domain ${cleanDomain} is AVAILABLE`)
-            } else {
-              console.log(`✗ Domain ${cleanDomain} is TAKEN`)
+            // If no extension provided or we're on a retry, assign based on retry count
+            if (!fullDomain.includes('.')) {
+              const extensions = retryCount === 0 ? ['.com'] :
+                               retryCount === 1 ? ['.io', '.co', '.app'] :
+                               ['.net', '.org', '.ai']
+              
+              // Use suggested extension if valid for this retry, otherwise pick randomly
+              const suggestedExt = suggestion.extension || '.com'
+              const useExtension = extensions.includes(suggestedExt) ? 
+                suggestedExt : 
+                extensions[Math.floor(Math.random() * extensions.length)]
+              
+              fullDomain = fullDomain + useExtension
+            } else if (suggestion.extension && !fullDomain.includes('.')) {
+              // Handle case where extension is provided separately
+              const extensionWithoutDot = suggestion.extension.substring(1)
+              if (fullDomain.endsWith(extensionWithoutDot)) {
+                fullDomain = fullDomain.slice(0, -extensionWithoutDot.length) + suggestion.extension
+              } else {
+                fullDomain = fullDomain + suggestion.extension
+              }
             }
             
-            suggestionsWithAvailability.push({
-              domain: cleanDomain,
-              available,
-              extension: suggestion.extension || '.com',
-              reason: suggestion.reason
-            })
-          } catch (error) {
-            // If domain check fails, don't include it in results
-            const err = error as Error
-            console.log(`✗ Domain ${cleanDomain} check failed:`, err.message)
+            const cleanDomain = formatDomainName(fullDomain)
             
-            // If it's an API key error, throw it to stop processing
-            if (err.message === 'Invalid Domainr API key') {
-              throw err
+            try {
+              const available = await checkDomainAvailability(cleanDomain, domainrApiKey)
+              
+              if (available) {
+                console.log(`✓ Domain ${cleanDomain} is AVAILABLE`)
+                return {
+                  domain: cleanDomain,
+                  available,
+                  extension: suggestion.extension || '.com',
+                  reason: suggestion.reason
+                }
+              } else {
+                console.log(`✗ Domain ${cleanDomain} is TAKEN`)
+                return null
+              }
+            } catch (error) {
+              // If domain check fails, return null
+              const err = error as Error
+              console.log(`✗ Domain ${cleanDomain} check failed:`, err.message)
+              
+              // If it's an API key error, throw it to stop processing
+              if (err.message === 'Invalid Domainr API key') {
+                throw err
+              }
+              return null
             }
-          }
-        }
+          })
+        )
         
-        // Filter out failed checks
-        const validSuggestions = suggestionsWithAvailability.filter(s => s !== null) as SuggestionResult[]
+        // Filter out null results and add to our collection
+        const newResults = suggestionsWithAvailability.filter(r => r !== null) as SuggestionResult[]
+        availableDomains.push(...newResults)
         
-        // If all domain checks failed due to API errors, throw error
-        if (validSuggestions.length === 0 && suggestionsWithAvailability.length > 0) {
-          const error = new Error('Domain availability API is unavailable')
-          if (apiDisabledUntil > Date.now()) {
-            throw new Error('Too many requests. Please try again later.')
-          }
-          throw error
-        }
+        // Add all checked domains to our tracking list
+        allSuggestedDomains.push(...currentBatch.map((d: { domain: string }) => d.domain))
         
-        // Add all suggested domains to our tracking list
-        allSuggestedDomains.push(...validSuggestions.map(d => d.domain))
-        
-        // Filter available domains and add to our results
-        const newAvailableDomains = validSuggestions.filter(d => d.available)
-        availableDomains.push(...newAvailableDomains)
-        
-        console.log(`Found ${newAvailableDomains.length} available domains in this batch`)
-        console.log(`Total available domains so far: ${availableDomains.length}`)
+        console.log(`Found ${newResults.length} available domains (total: ${availableDomains.length})`)
         
         retryCount++
         
