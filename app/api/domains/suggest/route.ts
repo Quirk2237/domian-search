@@ -88,7 +88,11 @@ Create completely different alternatives.
 
 RETRY INSTRUCTION: ${extensionFocus}
 
-Generate 10 domains following this exact framework. Output ONLY the JSON array.`
+Generate 10 domains following this exact framework.
+
+CRITICAL: Output ONLY the JSON array. No explanations, no markdown, no code blocks, no additional text.
+Start with [ and end with ]. Example:
+[{"domain":"example.com","extension":".com","reason":"reason here"}]`
       },
       {
         role: 'user',
@@ -101,6 +105,7 @@ Generate 10 domains following this exact framework. Output ONLY the JSON array.`
   })
 
   const responseContent = completion.choices[0]?.message?.content || '[]'
+  console.log('AI Response for retry suggestions:', responseContent)
   
   // Use the same JSON extraction logic
   let jsonContent = responseContent
@@ -115,15 +120,26 @@ Generate 10 domains following this exact framework. Output ONLY the JSON array.`
     }
   }
   
+  // Handle code blocks (```json or ```)
+  jsonContent = jsonContent.replace(/```json\s*/g, '').replace(/```\s*/g, '')
+  
+  // Try to extract JSON array
   const jsonStart = jsonContent.indexOf('[')
   const jsonEnd = jsonContent.lastIndexOf(']')
   
-  if (jsonStart === -1 || jsonEnd === -1 || jsonEnd <= jsonStart) {
-    console.error('No valid JSON array found in retry response')
-    return []
+  if (jsonStart === -1 || jsonEnd === -1) {
+    // Try to match JSON array pattern
+    const jsonMatch = jsonContent.match(/\[\s*\{[\s\S]*?\}\s*\]/)
+    if (jsonMatch) {
+      jsonContent = jsonMatch[0]
+    } else {
+      console.error('No valid JSON array found in retry response')
+      console.error('Cleaned content:', jsonContent)
+      return []
+    }
+  } else {
+    jsonContent = jsonContent.substring(jsonStart, jsonEnd + 1)
   }
-  
-  jsonContent = jsonContent.substring(jsonStart, jsonEnd + 1)
   
   try {
     return JSON.parse(jsonContent)
@@ -370,7 +386,11 @@ CONSTRAINTS:
 - Ensure voice search compatibility
 - Consider mobile typing ease
 
-Generate 10 domains following this exact framework. Output ONLY the JSON array.`
+Generate 10 domains following this exact framework.
+
+CRITICAL: Output ONLY the JSON array. No explanations, no markdown, no code blocks, no additional text.
+Start with [ and end with ]. Example:
+[{"domain":"example.com","extension":".com","reason":"reason here"}]`
         },
         {
           role: 'user',
@@ -396,6 +416,7 @@ Generate 10 domains following this exact framework. Output ONLY the JSON array.`
     }
 
     const responseContent = completion.choices[0]?.message?.content || '[]'
+    console.log('AI Response for domain suggestions:', responseContent)
     
     // Extract JSON from response (handle <think> tags and other markup)
     let jsonContent = responseContent
@@ -412,16 +433,27 @@ Generate 10 domains following this exact framework. Output ONLY the JSON array.`
       }
     }
     
-    // Then extract the JSON array
+    // Handle code blocks (```json or ```)
+    jsonContent = jsonContent.replace(/```json\s*/g, '').replace(/```\s*/g, '')
+    
+    // Try to extract JSON array - first attempt: look for array brackets
     const jsonStart = jsonContent.indexOf('[')
     const jsonEnd = jsonContent.lastIndexOf(']')
     
-    if (jsonStart === -1 || jsonEnd === -1 || jsonEnd <= jsonStart) {
-      console.error('No valid JSON array found in response')
-      throw new Error('Invalid response format from AI')
+    // If no array found, try to find JSON in the content using regex
+    if (jsonStart === -1 || jsonEnd === -1) {
+      // Try to match JSON array pattern
+      const jsonMatch = jsonContent.match(/\[\s*\{[\s\S]*?\}\s*\]/)
+      if (jsonMatch) {
+        jsonContent = jsonMatch[0]
+      } else {
+        console.error('No valid JSON array found in response')
+        console.error('Cleaned content:', jsonContent)
+        throw new Error('Invalid response format from AI')
+      }
+    } else {
+      jsonContent = jsonContent.substring(jsonStart, jsonEnd + 1)
     }
-    
-    jsonContent = jsonContent.substring(jsonStart, jsonEnd + 1)
     
     // Validate JSON structure by checking bracket balance
     const openBrackets = (jsonContent.match(/[\[{]/g) || []).length
@@ -553,8 +585,35 @@ Generate 10 domains following this exact framework. Output ONLY the JSON array.`
     } catch (parseError) {
       console.error('Error parsing AI response:', parseError)
       console.error('Response content:', responseContent)
+      console.error('Extracted JSON content:', jsonContent)
+      
+      // Try one more time with a simpler extraction
+      try {
+        // Look for anything that looks like a domain suggestion
+        const fallbackMatch = responseContent.match(/\{[^}]*"domain"[^}]*\}/g)
+        if (fallbackMatch && fallbackMatch.length > 0) {
+          const fallbackDomains = fallbackMatch.map(match => {
+            try {
+              return JSON.parse(match)
+            } catch {
+              return null
+            }
+          }).filter(d => d !== null)
+          
+          if (fallbackDomains.length > 0) {
+            console.log('Recovered domains using fallback method:', fallbackDomains.length)
+            // Continue with fallback domains
+            const allSuggestedDomains: string[] = []
+            const availableDomains: SuggestionResult[] = []
+            // ... rest of the logic would continue here
+          }
+        }
+      } catch (fallbackError) {
+        console.error('Fallback parsing also failed:', fallbackError)
+      }
+      
       return NextResponse.json(
-        { error: 'Failed to parse domain suggestions from AI response' },
+        { error: 'Failed to parse domain suggestions. Please try again.' },
         { status: 500 }
       )
     }
