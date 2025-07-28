@@ -117,7 +117,7 @@ Output format: ["variation1", "variation2", ...]`
     const responseContent = completion.choices[0]?.message?.content || '[]'
     
     // Extract JSON array
-    const jsonMatch = responseContent.match(/\[.*\]/s)
+    const jsonMatch = responseContent.match(/\[[\s\S]*?\]/)
     if (!jsonMatch) {
       console.error('No JSON array found in AI response')
       return []
@@ -433,7 +433,7 @@ export async function POST(request: NextRequest) {
           )
           
           // Filter out null results and add to our collection
-          const newResults = aiChecks.filter((r): r is DomainResult => r !== null)
+          const newResults = aiChecks.filter(r => r !== null) as DomainResult[]
           aiResults.push(...newResults)
           
           console.log(`Found ${newResults.length} available domains (total: ${aiResults.length})`)
@@ -456,10 +456,6 @@ export async function POST(request: NextRequest) {
         const exists = acc.find(item => item.domain === current.domain)
         if (!exists) {
           acc.push(current)
-        } else if (exists && current.score && (!exists.score || current.score > exists.score)) {
-          // If duplicate exists but current has better score, replace it
-          const index = acc.findIndex(item => item.domain === current.domain)
-          acc[index] = current
         }
         return acc
       }, [] as DomainResult[])
