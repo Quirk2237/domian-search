@@ -63,6 +63,11 @@ This is a Next.js 15 SaaS template using the App Router with clear separation be
 - `STRIPE_SECRET_KEY` - Stripe secret key
 - Database connection handled by Supabase CLI
 
+### Stripe API Version
+- **Current API Version**: `2025-05-28.basil` 
+- When updating the Stripe npm package, check if the TypeScript types support newer API versions
+- API version is set in `/lib/stripe.ts` - update only when TypeScript types are compatible
+
 ## Supabase Integration
 
 **IMPORTANT**: Always use MCP (Model Context Protocol) tools for all Supabase database operations instead of direct SQL commands or CLI:
@@ -70,6 +75,14 @@ This is a Next.js 15 SaaS template using the App Router with clear separation be
 - For schema changes, use `mcp__supabase__apply_migration` instead of `npx drizzle-kit push`
 - For data queries, use `mcp__supabase__execute_sql` for read operations
 - Check available MCP Supabase tools before performing any database action
+
+## Linting Best Practices
+
+When fixing linting errors:
+- After resolving linting issues, evaluate if the error represents a pattern that should be prevented project-wide
+- If the linting rule makes sense for the codebase, add it to the ESLint configuration to maintain consistency
+- Document any custom ESLint rules or overrides with comments explaining the rationale
+- Example: If fixing unused variable errors that are intentionally unused (e.g., destructuring for omission), consider adding the appropriate ESLint rule configuration
 
 ## Git Workflow
 
