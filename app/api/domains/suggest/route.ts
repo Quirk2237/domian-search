@@ -344,14 +344,8 @@ export async function POST(request: NextRequest) {
     // Initialize Groq client
     const groq = new Groq({ apiKey: groqApiKey })
 
-    // Generate domain suggestions using AI
-    let completion
-    try {
-      completion = await groq.chat.completions.create({
-      messages: [
-        {
-          role: 'system',
-          content: `You are an expert domain name strategist. Generate domain suggestions using this valuation framework:
+    // Store the current prompt for evaluation
+    const currentPrompt = `You are an expert domain name strategist. Generate domain suggestions using this valuation framework:
 
 CORE WEIGHTS: Brandability (26%) > TLD Extension (22%) > Keywords/SEO (21%) > Length (21%) > History potential (9%)
 
@@ -391,18 +385,27 @@ Generate 10 domains following this exact framework.
 CRITICAL: Output ONLY the JSON array. No explanations, no markdown, no code blocks, no additional text.
 Start with [ and end with ]. Example:
 [{"domain":"example.com","extension":".com","reason":"reason here"}]`
-        },
-        {
-          role: 'user',
-          content: query.length > 500 ? 
-            `Business description: ${processedQuery}\n\nIMPORTANT: Extract and focus on their UNIQUE selling points and differentiators. Create domains that capture their SPECIFIC value proposition, not generic industry terms.\n\nREMEMBER: Follow ANY specific domain requirements mentioned above exactly as requested!` : 
-            `${processedQuery}\n\nREMEMBER: Follow ANY specific domain requirements mentioned above exactly as requested!`
-        }
-      ],
-      model: 'llama-3.1-8b-instant',
-      temperature: 0.3,
-      max_tokens: 2000
-    })
+
+    // Generate domain suggestions using AI
+    let completion
+    try {
+      completion = await groq.chat.completions.create({
+        messages: [
+          {
+            role: 'system',
+            content: currentPrompt
+          },
+          {
+            role: 'user',
+            content: query.length > 500 ? 
+              `Business description: ${processedQuery}\n\nIMPORTANT: Extract and focus on their UNIQUE selling points and differentiators. Create domains that capture their SPECIFIC value proposition, not generic industry terms.\n\nREMEMBER: Follow ANY specific domain requirements mentioned above exactly as requested!` : 
+              `${processedQuery}\n\nREMEMBER: Follow ANY specific domain requirements mentioned above exactly as requested!`
+          }
+        ],
+        model: 'llama-3.1-8b-instant',
+        temperature: 0.3,
+        max_tokens: 2000
+      })
     } catch (groqError) {
       const error = groqError as { status?: number; message?: string }
       console.error('GROQ API error:', error.status, error.message)
@@ -470,6 +473,7 @@ Start with [ and end with ]. Example:
       
       const allSuggestedDomains: string[] = []
       const availableDomains: SuggestionResult[] = []
+      const unavailableDomains: Array<{ domain: string; extension: string; reason?: string }> = []
       let retryCount = 0
       const maxRetries = 3 // Match domain mode for better results
       const targetAvailableDomains = 5 // Match domain mode target
@@ -524,11 +528,24 @@ Start with [ and end with ]. Example:
                   domain: cleanDomain,
                   available,
                   extension: suggestion.extension || '.com',
-                  reason: suggestion.reason
+                  reason: suggestion.reason,
+                  status: 'available' as const
                 }
               } else {
                 console.log(`✗ Domain ${cleanDomain} is TAKEN`)
-                return null
+                // Track unavailable domains
+                unavailableDomains.push({
+                  domain: cleanDomain,
+                  extension: suggestion.extension || '.com',
+                  reason: suggestion.reason
+                })
+                return {
+                  domain: cleanDomain,
+                  available: false,
+                  extension: suggestion.extension || '.com',
+                  reason: suggestion.reason,
+                  status: 'unavailable' as const
+                }
               }
             } catch (error) {
               // If domain check fails, return null
@@ -544,14 +561,16 @@ Start with [ and end with ]. Example:
           })
         )
         
-        // Filter out null results and add to our collection
-        const newResults = suggestionsWithAvailability.filter(r => r !== null) as SuggestionResult[]
-        availableDomains.push(...newResults)
+        // Separate available and unavailable results
+        const results = suggestionsWithAvailability.filter(r => r !== null) as Array<SuggestionResult & { status: 'available' | 'unavailable' }>
+        const newAvailableResults = results.filter(r => r.status === 'available')
+        availableDomains.push(...newAvailableResults)
         
         // Add all checked domains to our tracking list
         allSuggestedDomains.push(...currentBatch.map((d: { domain: string }) => d.domain))
         
-        console.log(`Found ${newResults.length} available domains (total: ${availableDomains.length})`)
+        console.log(`Found ${newAvailableResults.length} available domains (total: ${availableDomains.length})`)
+        console.log(`Total unavailable domains checked: ${unavailableDomains.length}`)
         
         retryCount++
         
@@ -577,6 +596,43 @@ Start with [ and end with ]. Example:
 
       // Limit to best 10 available domains
       const finalDomains = uniqueDomains.slice(0, 10)
+
+      // Evaluate the suggestions if evaluation is enabled
+      if (process.env.ENABLE_DOMAIN_EVALUATION === 'true') {
+        try {
+          // Prepare all attempted domains (including from all retries)
+          const allAttempted = suggestedDomains.concat(
+            ...Array.from({ length: retryCount }, (_, i) => 
+              allSuggestedDomains.slice(suggestedDomains.length + i * 10, suggestedDomains.length + (i + 1) * 10)
+            ).flat()
+          )
+
+          const evaluationPayload = {
+            query: processedQuery,
+            currentPrompt: currentPrompt,
+            results: {
+              suggested: finalDomains,
+              attempted: allAttempted,
+              unavailable: unavailableDomains
+            }
+          }
+
+          // Call evaluation endpoint
+          const evalResponse = await fetch(`${request.nextUrl.origin}/api/domains/evaluate`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(evaluationPayload)
+          })
+
+          if (!evalResponse.ok) {
+            console.error('Evaluation failed:', await evalResponse.text())
+          }
+          // Evaluation results are logged in the evaluate endpoint
+        } catch (evalError) {
+          console.error('Error during domain evaluation:', evalError)
+          // Don't fail the request if evaluation fails
+        }
+      }
 
       // Cache the results
       cache.set(cacheKey, { data: finalDomains, timestamp: Date.now() })
