@@ -42,34 +42,45 @@ async function generateMoreSuggestions(
     messages: [
       {
         role: 'system',
-        content: `Generate 10 domain name suggestions. Output ONLY a JSON array starting with [ and ending with ].
+        content: `You are an expert domain name strategist. Generate domain suggestions using this valuation framework:
 
-IMPORTANT: For long business descriptions, first identify:
-1. The UNIQUE value proposition (what makes them different)
-2. The main benefit to customers
-3. Key differentiators from competitors
-4. Emotional hooks or promises
+CORE WEIGHTS: Brandability (26%) > TLD Extension (22%) > Keywords/SEO (21%) > Length (21%) > History potential (9%)
 
-Then create domains that capture THESE SPECIFIC ASPECTS, not generic industry terms.
+CRITICAL USER REQUIREMENTS: If the user specifies ANY requirements (e.g., 'only .com domains', '10-letter domain', 'domains starting with tech'), you MUST follow these EXACTLY. Override all other rules.
 
-Examples of good vs bad:
-- Bad: taskautomation.com (generic)
-- Good: freetaskfix.com (captures "free" + solving problems)
-- Bad: efficienza.app (generic efficiency)  
-- Good: proofirst.io (unique "proof before payment" concept)
+LENGTH COUNTING: When user specifies domain length, count ONLY characters BEFORE the extension:
+- "hatsbylaxx.com" = 10 letters (correct for "10-letter domain")
+- "techstart.io" = 9 letters (correct for "9-letter domain")
 
-JSON format:
-[{"domain":"example.com","extension":".com","reason":"Brief reason"}]
+GENERATION PROCESS:
+1. Analyze app idea: Extract core function, target audience, unique value, key benefits
+2. Generate by tier:
+   - Tier 1: Premium single-word .com (3-10 chars)
+   - Tier 2: Two-word brandable .com (6-15 chars total)
+   - Tier 3: Invented brandable .com (5-10 chars, phonetically simple)
+   - Tier 4: Alternative TLDs (.ai, .io, .app) only if perfect match
+3. Apply quality filters: Radio test, phone test, memory test, typing test
+4. Prioritize: Initial plosives (P,B,T,D,K,G), alliteration, emotional resonance
 
-Rules:
-- Domains under 15 characters
-- Use .com, .io, .co, .ai, .app, .dev
-- Focus on UNIQUE aspects, not generic terms
-- Mix benefit-driven names with creative abstractions
-- NO THINKING, NO TAGS, NO EXPLANATIONS - ONLY JSON
+OUTPUT FORMAT - JSON array with exactly 10 domains distributed across tiers:
+[
+  {"domain":"voice.com","extension":".com","reason":"Premium single-word, instant brand recognition"},
+  {"domain":"paypal.com","extension":".com","reason":"Two-word brandable, natural pairing"},
+  {"domain":"spotify.com","extension":".com","reason":"Invented brandable, memorable sound"},
+  {"domain":"genius.ai","extension":".ai","reason":"Perfect AI keyword match"}
+]
+
+CONSTRAINTS:
+- All domains under 17 characters (before extension)
+- No hyphens, numbers, special characters
+- Prioritize .com (3.8x more likely to be typed)
+- Ensure voice search compatibility
+- Consider mobile typing ease
 
 IMPORTANT: Avoid these already suggested domains: ${existingDomains.join(', ')}
-Create completely different alternatives.`
+Create completely different alternatives.
+
+Generate 10 domains following this exact framework. Output ONLY the JSON array.`
       },
       {
         role: 'user',
@@ -316,37 +327,48 @@ export async function POST(request: NextRequest) {
       messages: [
         {
           role: 'system',
-          content: `Generate 10 domain name suggestions. Output ONLY a JSON array starting with [ and ending with ].
+          content: `You are an expert domain name strategist. Generate domain suggestions using this valuation framework:
 
-IMPORTANT: For long business descriptions, first identify:
-1. The UNIQUE value proposition (what makes them different)
-2. The main benefit to customers
-3. Key differentiators from competitors
-4. Emotional hooks or promises
+CORE WEIGHTS: Brandability (26%) > TLD Extension (22%) > Keywords/SEO (21%) > Length (21%) > History potential (9%)
 
-Then create domains that capture THESE SPECIFIC ASPECTS, not generic industry terms.
+CRITICAL USER REQUIREMENTS: If the user specifies ANY requirements (e.g., 'only .com domains', '10-letter domain', 'domains starting with tech'), you MUST follow these EXACTLY. Override all other rules.
 
-Examples of good vs bad:
-- Bad: taskautomation.com (generic)
-- Good: freetaskfix.com (captures "free" + solving problems)
-- Bad: efficienza.app (generic efficiency)  
-- Good: proofirst.io (unique "proof before payment" concept)
+LENGTH COUNTING: When user specifies domain length, count ONLY characters BEFORE the extension:
+- "hatsbylaxx.com" = 10 letters (correct for "10-letter domain")
+- "techstart.io" = 9 letters (correct for "9-letter domain")
 
-JSON format:
-[{"domain":"example.com","extension":".com","reason":"Brief reason"}]
+GENERATION PROCESS:
+1. Analyze app idea: Extract core function, target audience, unique value, key benefits
+2. Generate by tier:
+   - Tier 1: Premium single-word .com (3-10 chars)
+   - Tier 2: Two-word brandable .com (6-15 chars total)
+   - Tier 3: Invented brandable .com (5-10 chars, phonetically simple)
+   - Tier 4: Alternative TLDs (.ai, .io, .app) only if perfect match
+3. Apply quality filters: Radio test, phone test, memory test, typing test
+4. Prioritize: Initial plosives (P,B,T,D,K,G), alliteration, emotional resonance
 
-Rules:
-- Domains under 15 characters
-- Use .com, .io, .co, .ai, .app, .dev
-- Focus on UNIQUE aspects, not generic terms
-- Mix benefit-driven names with creative abstractions
-- NO THINKING, NO TAGS, NO EXPLANATIONS - ONLY JSON`
+OUTPUT FORMAT - JSON array with exactly 10 domains distributed across tiers:
+[
+  {"domain":"voice.com","extension":".com","reason":"Premium single-word, instant brand recognition"},
+  {"domain":"paypal.com","extension":".com","reason":"Two-word brandable, natural pairing"},
+  {"domain":"spotify.com","extension":".com","reason":"Invented brandable, memorable sound"},
+  {"domain":"genius.ai","extension":".ai","reason":"Perfect AI keyword match"}
+]
+
+CONSTRAINTS:
+- All domains under 17 characters (before extension)
+- No hyphens, numbers, special characters
+- Prioritize .com (3.8x more likely to be typed)
+- Ensure voice search compatibility
+- Consider mobile typing ease
+
+Generate 10 domains following this exact framework. Output ONLY the JSON array.`
         },
         {
           role: 'user',
           content: query.length > 500 ? 
-            `Business description: ${processedQuery}\n\nIMPORTANT: Extract and focus on their UNIQUE selling points and differentiators. Create domains that capture their SPECIFIC value proposition, not generic industry terms.` : 
-            processedQuery
+            `Business description: ${processedQuery}\n\nIMPORTANT: Extract and focus on their UNIQUE selling points and differentiators. Create domains that capture their SPECIFIC value proposition, not generic industry terms.\n\nREMEMBER: Follow ANY specific domain requirements mentioned above exactly as requested!` : 
+            `${processedQuery}\n\nREMEMBER: Follow ANY specific domain requirements mentioned above exactly as requested!`
         }
       ],
       model: 'llama-3.1-8b-instant',
@@ -407,7 +429,7 @@ Rules:
       console.log('Parsed domains from AI:', suggestedDomains.length)
       
       const allSuggestedDomains: string[] = []
-      let availableDomains: SuggestionResult[] = []
+      const availableDomains: SuggestionResult[] = []
       let retryCount = 0
       const maxRetries = 1 // Reduced from 3 to avoid rate limits
       const targetAvailableDomains = 3 // Reduced from 5 to minimize API calls
@@ -505,13 +527,22 @@ Rules:
         }
       }
       
+      // Remove duplicates based on domain name
+      const uniqueDomains = availableDomains.reduce((acc, current) => {
+        const exists = acc.find(item => item.domain === current.domain)
+        if (!exists) {
+          acc.push(current)
+        }
+        return acc
+      }, [] as SuggestionResult[])
+
       // Limit to best 10 available domains
-      availableDomains = availableDomains.slice(0, 10)
+      const finalDomains = uniqueDomains.slice(0, 10)
 
       // Cache the results
-      cache.set(cacheKey, { data: availableDomains, timestamp: Date.now() })
+      cache.set(cacheKey, { data: finalDomains, timestamp: Date.now() })
 
-      return NextResponse.json({ suggestions: availableDomains })
+      return NextResponse.json({ suggestions: finalDomains })
     } catch (parseError) {
       console.error('Error parsing AI response:', parseError)
       console.error('Response content:', responseContent)

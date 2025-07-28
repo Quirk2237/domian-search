@@ -46,7 +46,7 @@ export function SuggestionResults({ results }: SuggestionResultsProps) {
       </motion.h3>
       {results.map((result, index) => (
         <motion.div
-          key={result.domain}
+          key={`${result.domain}-${index}`}
           className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-4 bg-card border border-border rounded-lg min-h-[56px] gap-3"
           variants={item}
           whileHover={{ 
