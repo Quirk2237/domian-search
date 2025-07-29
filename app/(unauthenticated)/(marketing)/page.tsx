@@ -3,7 +3,7 @@
 import { DomainSearch } from '@/components/domain-search/domain-search'
 import { motion, AnimatePresence } from 'framer-motion'
 import { ThemeToggle } from '@/components/theme-toggle'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import { cn } from '@/lib/utils'
 import { useSearchParams } from 'next/navigation'
 
@@ -13,7 +13,7 @@ const fadeInUp = {
   transition: { duration: 0.5 }
 }
 
-export default function MarketingPage() {
+function MarketingContent() {
   const [hasContent, setHasContent] = useState(false)
   const [hasResults, setHasResults] = useState(false)
   const searchParams = useSearchParams()
@@ -133,5 +133,13 @@ export default function MarketingPage() {
         </motion.main>
       </AnimatePresence>
     </>
+  )
+}
+
+export default function MarketingPage() {
+  return (
+    <Suspense fallback={null}>
+      <MarketingContent />
+    </Suspense>
   )
 }

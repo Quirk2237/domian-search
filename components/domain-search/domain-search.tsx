@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback, useEffect, useRef } from 'react'
+import { useState, useCallback, useEffect, useRef, Suspense } from 'react'
 import debounce from 'lodash.debounce'
 import { Search, Loader2 } from 'lucide-react'
 import { Textarea } from '@/components/ui/textarea'
@@ -33,7 +33,7 @@ interface SuggestionResult {
   reason?: string
 }
 
-export function DomainSearch({ className, onQueryChange, onResultsChange, initialQuery = '', initialMode }: DomainSearchProps) {
+function DomainSearchInner({ className, onQueryChange, onResultsChange, initialQuery = '', initialMode }: DomainSearchProps) {
   const [query, setQuery] = useState(initialQuery)
   const [searchMode, setSearchMode] = useState<'domain' | 'suggestion'>(initialMode || 'domain')
   const [isLoading, setIsLoading] = useState(false)
@@ -403,5 +403,13 @@ export function DomainSearch({ className, onQueryChange, onResultsChange, initia
         )}
       </AnimatePresence>
     </div>
+  )
+}
+
+export function DomainSearch(props: DomainSearchProps) {
+  return (
+    <Suspense fallback={null}>
+      <DomainSearchInner {...props} />
+    </Suspense>
   )
 }
