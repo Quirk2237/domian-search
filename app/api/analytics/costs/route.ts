@@ -42,9 +42,9 @@ export async function GET(request: NextRequest) {
     const providerBreakdown = await getCostBreakdownByProvider(startDate, endDate)
     
     // Calculate additional metrics
-    const totalSearches = parseInt(analytics.total_searches) || 0
-    const avgCostPerSearch = parseFloat(analytics.avg_cost_per_search) || 0
-    const totalCost = parseFloat(analytics.total_cost) || 0
+    const totalSearches = parseInt(String(analytics.total_searches)) || 0
+    const avgCostPerSearch = parseFloat(String(analytics.avg_cost_per_search)) || 0
+    const totalCost = parseFloat(String(analytics.total_cost)) || 0
     
     // Format response
     const response = {
@@ -55,17 +55,17 @@ export async function GET(request: NextRequest) {
         totalSearches,
         totalCost: totalCost.toFixed(6),
         avgCostPerSearch: avgCostPerSearch.toFixed(6),
-        totalTokens: parseInt(analytics.total_tokens) || 0,
-        avgTokensPerSearch: parseFloat(analytics.avg_tokens_per_search) || 0,
-        totalGroqCost: parseFloat(analytics.total_groq_cost) || 0,
-        totalDomainrRequests: parseInt(analytics.total_domainr_requests) || 0
+        totalTokens: parseInt(String(analytics.total_tokens)) || 0,
+        avgTokensPerSearch: parseFloat(String(analytics.avg_tokens_per_search)) || 0,
+        totalGroqCost: parseFloat(String(analytics.total_groq_cost)) || 0,
+        totalDomainrRequests: parseInt(String(analytics.total_domainr_requests)) || 0
       },
-      providerBreakdown: providerBreakdown.map((provider: ProviderBreakdown) => ({
-        provider: provider.provider,
-        requestCount: parseInt(provider.request_count) || 0,
-        totalCost: parseFloat(provider.total_cost) || 0,
-        avgCost: parseFloat(provider.avg_cost) || 0,
-        totalTokens: parseInt(provider.total_tokens) || 0
+      providerBreakdown: providerBreakdown.map((provider) => ({
+        provider: String(provider.provider),
+        requestCount: parseInt(String(provider.request_count)) || 0,
+        totalCost: parseFloat(String(provider.total_cost)) || 0,
+        avgCost: parseFloat(String(provider.avg_cost)) || 0,
+        totalTokens: parseInt(String(provider.total_tokens)) || 0
       })),
       // Cost per 1000 searches
       costPer1000Searches: totalSearches > 0 ? (totalCost / totalSearches * 1000).toFixed(2) : '0.00',
