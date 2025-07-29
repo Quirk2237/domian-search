@@ -35,7 +35,13 @@ export function calculateGroqCost(tokens: number): number {
 /**
  * Extract token usage from Groq API response
  */
-export function extractGroqTokenUsage(response: any): TokenUsage | null {
+export function extractGroqTokenUsage(response: {
+  usage?: {
+    prompt_tokens?: number
+    completion_tokens?: number
+    total_tokens?: number
+  }
+}): TokenUsage | null {
   // Groq API may include usage information in the response
   if (response?.usage) {
     return {
@@ -109,7 +115,7 @@ export async function updateSearchCosts(
 ): Promise<void> {
   try {
     const updates: string[] = []
-    const values: any[] = []
+    const values: (string | number | null)[] = []
     let paramCount = 1
 
     if (data.llmModel !== undefined) {
