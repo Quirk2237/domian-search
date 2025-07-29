@@ -1,6 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getCostAnalytics, getCostBreakdownByProvider } from '@/lib/cost-tracking'
 
+interface ProviderBreakdown {
+  provider: string
+  request_count: string
+  total_cost: string
+  avg_cost: string
+  total_tokens: string
+}
+
 export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams
@@ -52,7 +60,7 @@ export async function GET(request: NextRequest) {
         totalGroqCost: parseFloat(analytics.total_groq_cost) || 0,
         totalDomainrRequests: parseInt(analytics.total_domainr_requests) || 0
       },
-      providerBreakdown: providerBreakdown.map(provider => ({
+      providerBreakdown: providerBreakdown.map((provider: ProviderBreakdown) => ({
         provider: provider.provider,
         requestCount: parseInt(provider.request_count) || 0,
         totalCost: parseFloat(provider.total_cost) || 0,
