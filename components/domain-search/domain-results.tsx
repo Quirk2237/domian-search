@@ -37,6 +37,7 @@ const item = {
 export function DomainResults({ results, searchQuery }: DomainResultsProps) {
   const shouldReduceMotion = useReducedMotion()
   
+  
   // Sort results: requested first (if any), then exact matches, then suggestions
   const sortedResults = [...results].sort((a, b) => {
     if (a.requested) return -1
@@ -71,9 +72,15 @@ export function DomainResults({ results, searchQuery }: DomainResultsProps) {
     try {
       const url = window.location.href
       await navigator.clipboard.writeText(url)
-      toast.success('Link copied to clipboard!')
+      toast.success('Link copied to clipboard!', {
+        description: 'Share this URL to show your domain search results',
+        duration: 3000,
+      })
     } catch (error) {
-      toast.error('Failed to copy link')
+      toast.error('Failed to copy link', {
+        description: 'Please try copying manually',
+        duration: 3000,
+      })
       console.error('Error copying to clipboard:', error)
     }
   }, [])
@@ -108,10 +115,12 @@ export function DomainResults({ results, searchQuery }: DomainResultsProps) {
       {sortedResults.map((result, index) => (
         <motion.div
           key={result.domain}
-          className={`flex flex-col sm:flex-row sm:items-center sm:justify-between p-4 rounded-lg min-h-[64px] gap-3 ${
+          className={`flex flex-col sm:flex-row sm:items-center sm:justify-between p-4 rounded-lg min-h-[64px] gap-3 bg-card ${
             result.requested && !result.available 
-              ? 'bg-red-50 border-2 border-red-200'
-              : 'bg-card border border-border'
+              ? 'border-2 border-red-200'
+              : result.requested 
+                ? 'border border-blue-600'
+                : 'border border-border'
           }`}
           variants={item}
           whileHover={shouldReduceMotion ? {} : { 

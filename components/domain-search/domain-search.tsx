@@ -24,6 +24,8 @@ interface DomainResult {
   domain: string
   available: boolean
   extension: string
+  requested?: boolean
+  suggested?: boolean
 }
 
 interface SuggestionResult {
