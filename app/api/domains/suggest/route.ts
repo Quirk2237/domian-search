@@ -156,7 +156,10 @@ IMPORTANT: Output ONLY the JSON array. Start with [ and end with ].`
         console.error('No valid JSON array found in retry response')
         console.error('Raw response:', responseContent.substring(0, 500))
         console.error('Cleaned content:', jsonContent.substring(0, 500))
-        return []
+        return { 
+          suggestions: [], 
+          tokenUsage: { inputTokens, outputTokens, cost }
+        }
       }
     }
   } else {
