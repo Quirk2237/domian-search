@@ -9,7 +9,7 @@ A modern AI-powered domain name search and suggestion platform built with Next.j
   - Single word → Domain availability checking across multiple TLDs
   - Multiple words → AI-powered domain name suggestions
 - **Real-time Domain Availability** - Instant checking via Domainr API
-- **AI Domain Suggestions** - Powered by Groq (Qwen 3 model)
+- **AI Domain Suggestions** - Powered by Groq (gemma2-9b-it)
 - **Analytics Dashboard** - Track searches, suggestions, and user engagement
 - **Domain Quality Evaluation** - AI-powered evaluation system for improving suggestions
 
@@ -18,6 +18,7 @@ A modern AI-powered domain name search and suggestion platform built with Next.j
 - **Payment Integration** - Stripe subscription management
 - **Database** - Supabase (PostgreSQL) with Drizzle ORM
 - **Analytics Tracking** - Custom analytics for domain searches and clicks
+- **Cost Tracking** - Real-time API usage and cost monitoring
 - **Mobile Optimized** - Responsive design with touch-friendly interfaces
 - **Performance** - Sub-second domain checks, <2s AI suggestions
 
@@ -148,11 +149,12 @@ npx shadcn@latest add [component] # Add Shadcn components
 
 The application uses the following main tables:
 - `prompt_versions` - Stores AI prompt versions for domain suggestions
-- `domain_searches` - Tracks all domain searches (single word or phrase)
+- `domain_searches` - Tracks all domain searches with cost data
 - `domain_suggestions` - Stores AI-generated domain suggestions
 - `domain_clicks` - Analytics for domain clicks
 - `quality_checklist_versions` - Domain quality evaluation criteria
 - `domain_search_scores` - Evaluation scores for suggestions
+- `api_usage_logs` - Detailed API call tracking and costs
 
 ## Key Features Explained
 
@@ -171,12 +173,26 @@ Automatic scoring via Supabase Edge Function:
   npx supabase secrets set ANTHROPIC_API_KEY=your-key
   ```
 
+### Cost Tracking System
+Real-time API usage and cost monitoring:
+- **Groq API**: $0.20 per 5M tokens (gemma2-9b-it model)
+- **Average cost**: ~$0.0003 per domain search
+- Tracks token usage (input/output) per search
+- Stores LLM model and temperature settings
+- Monitors Domainr API request counts
+- Detailed cost analytics in dashboard
+
 ### Analytics Dashboard
 Available at `/stats`, shows:
 - Total searches and suggestions
 - Popular search queries
 - Domain extension distribution
 - Recent search activity
+- **Cost Analytics** (new):
+  - Real-time cost tracking per search
+  - Token usage statistics
+  - API cost breakdown by provider
+  - Estimated monthly costs
 
 ## Contributing
 

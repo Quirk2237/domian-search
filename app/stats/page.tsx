@@ -9,7 +9,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { Search, MousePointerClick, Globe, TrendingUp, Clock } from 'lucide-react'
+import { Search, MousePointerClick, Globe, TrendingUp, Clock, DollarSign, Zap } from 'lucide-react'
 import { useSpring, animated } from '@react-spring/web'
 
 interface StatsData {
@@ -27,6 +27,20 @@ interface StatsData {
     domain: string
     clicks: number
   }>
+}
+
+interface CostData {
+  summary: {
+    totalSearches: number
+    totalCost: string
+    avgCostPerSearch: string
+    totalTokens: number
+    avgTokensPerSearch: number
+    totalGroqCost: number
+    totalDomainrRequests: number
+  }
+  costPer1000Searches: string
+  estimatedMonthlyCost: string
 }
 
 interface SearchHistoryItem {
@@ -87,6 +101,7 @@ const cardVariants = {
 
 export default function StatsPage() {
   const [stats, setStats] = useState<StatsData | null>(null)
+  const [costData, setCostData] = useState<CostData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [searchHistoryOpen, setSearchHistoryOpen] = useState(false)
@@ -96,6 +111,7 @@ export default function StatsPage() {
 
   useEffect(() => {
     fetchStats()
+    fetchCostData()
   }, [])
 
   const fetchStats = async () => {
@@ -108,6 +124,18 @@ export default function StatsPage() {
       setError(err instanceof Error ? err.message : 'An error occurred')
     } finally {
       setLoading(false)
+    }
+  }
+
+  const fetchCostData = async () => {
+    try {
+      const response = await fetch('/api/analytics/costs?range=7d')
+      if (!response.ok) throw new Error('Failed to fetch cost data')
+      const data = await response.json()
+      setCostData(data)
+    } catch (err) {
+      console.error('Error fetching cost data:', err)
+      // Don't set main error state for cost data failure
     }
   }
 
@@ -194,6 +222,7 @@ export default function StatsPage() {
       <Tabs defaultValue="overview" className="space-y-4">
         <TabsList>
           <TabsTrigger value="overview">Overview</TabsTrigger>
+          <TabsTrigger value="costs">Costs</TabsTrigger>
           <TabsTrigger value="trends">Trends</TabsTrigger>
           <TabsTrigger value="performance">Performance</TabsTrigger>
         </TabsList>
@@ -395,6 +424,177 @@ export default function StatsPage() {
                 </CardContent>
               </Card>
             </motion.div>
+          )}
+        </TabsContent>
+
+        <TabsContent value="costs" className="space-y-4">
+          {costData ? (
+            <>
+              {/* Cost Metric Cards */}
+              <motion.div
+                className="grid gap-4 md:grid-cols-2 lg:grid-cols-4"
+                variants={containerVariants}
+                initial="hidden"
+                animate="visible"
+              >
+                <motion.div variants={cardVariants}>
+                  <Card>
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                      <CardTitle className="text-sm font-medium">
+                        Total Cost (7d)
+                      </CardTitle>
+                      <DollarSign className="h-4 w-4 text-muted-foreground" />
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-2xl font-bold">
+                        ${parseFloat(costData.summary.totalCost).toFixed(4)}
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        Past 7 days
+                      </p>
+                    </CardContent>
+                  </Card>
+                </motion.div>
+
+                <motion.div variants={cardVariants}>
+                  <Card>
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                      <CardTitle className="text-sm font-medium">
+                        Avg Cost/Search
+                      </CardTitle>
+                      <Zap className="h-4 w-4 text-muted-foreground" />
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-2xl font-bold">
+                        ${parseFloat(costData.summary.avgCostPerSearch).toFixed(4)}
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        Per domain search
+                      </p>
+                    </CardContent>
+                  </Card>
+                </motion.div>
+
+                <motion.div variants={cardVariants}>
+                  <Card>
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                      <CardTitle className="text-sm font-medium">
+                        Cost/1K Searches
+                      </CardTitle>
+                      <TrendingUp className="h-4 w-4 text-muted-foreground" />
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-2xl font-bold">
+                        ${costData.costPer1000Searches}
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        Per thousand searches
+                      </p>
+                    </CardContent>
+                  </Card>
+                </motion.div>
+
+                <motion.div variants={cardVariants}>
+                  <Card>
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                      <CardTitle className="text-sm font-medium">
+                        Est. Monthly
+                      </CardTitle>
+                      <DollarSign className="h-4 w-4 text-muted-foreground" />
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-2xl font-bold">
+                        ${costData.estimatedMonthlyCost}
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        At current rate
+                      </p>
+                    </CardContent>
+                  </Card>
+                </motion.div>
+              </motion.div>
+
+              {/* Token Usage Card */}
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ delay: 0.4, duration: 0.5 }}
+              >
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Token Usage</CardTitle>
+                    <CardDescription>
+                      AI model token consumption over the past 7 days
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <p className="text-sm text-muted-foreground">Total Tokens</p>
+                        <p className="text-2xl font-bold">
+                          {costData.summary.totalTokens.toLocaleString()}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-muted-foreground">Avg Tokens/Search</p>
+                        <p className="text-2xl font-bold">
+                          {Math.round(costData.summary.avgTokensPerSearch).toLocaleString()}
+                        </p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </motion.div>
+
+              {/* Cost Breakdown Card */}
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.5, duration: 0.5 }}
+              >
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Cost Breakdown</CardTitle>
+                    <CardDescription>
+                      API usage and costs by provider
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <Badge variant="outline">Groq AI</Badge>
+                          <span className="text-sm text-muted-foreground">
+                            Domain suggestions (Gemma2-9b)
+                          </span>
+                        </div>
+                        <span className="font-medium">
+                          ${costData.summary.totalGroqCost.toFixed(4)}
+                        </span>
+                      </div>
+                      <Separator />
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <Badge variant="outline">Domainr</Badge>
+                          <span className="text-sm text-muted-foreground">
+                            Availability checks ({costData.summary.totalDomainrRequests} requests)
+                          </span>
+                        </div>
+                        <span className="font-medium text-green-600">
+                          Free tier
+                        </span>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </motion.div>
+            </>
+          ) : (
+            <Card>
+              <CardContent className="pt-6">
+                <p className="text-muted-foreground">Loading cost data...</p>
+              </CardContent>
+            </Card>
           )}
         </TabsContent>
 

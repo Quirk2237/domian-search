@@ -6,6 +6,13 @@ import { getClientIp, checkRateLimit } from '@/lib/rate-limit'
 import { getCachedDomainAvailability, setCachedDomainAvailability, throttleRequest } from '@/lib/domain-cache'
 import { getActivePrompt, getActivePromptId } from '@/lib/prompts'
 import { getSessionId, trackDomainSearch, trackDomainSuggestions } from '@/lib/analytics'
+import { 
+  extractGroqTokenUsage, 
+  estimateTokenCount, 
+  calculateGroqCost,
+  logApiUsage,
+  updateSearchCosts
+} from '@/lib/cost-tracking'
 
 // Simple in-memory cache
 interface SuggestionResult {
@@ -34,12 +41,18 @@ async function generateMoreSuggestions(
   basePrompt: string,
   groqApiKey?: string,
   retryCount: number = 0
-): Promise<Array<{ domain: string; extension?: string; reason?: string }>> {
+): Promise<{
+  suggestions: Array<{ domain: string; extension?: string; reason?: string }>,
+  tokenUsage: { inputTokens: number, outputTokens: number, cost: number }
+}> {
   console.log(`Generating more suggestions for retry ${retryCount}. Original query:`, query)
   
   if (!groqApiKey) {
     // Return empty array if no API key
-    return []
+    return { 
+      suggestions: [], 
+      tokenUsage: { inputTokens: 0, outputTokens: 0, cost: 0 }
+    }
   }
 
   const groq = new Groq({ apiKey: groqApiKey })
@@ -74,6 +87,7 @@ IMPORTANT: Output ONLY the JSON array. Start with [ and end with ].`
 
   const modifiedPrompt = retryPretext + basePrompt + extensionGuidance + outputFormat
 
+  const retryTemperature = 0.4 // Slightly higher for more variety on retries
   const completion = await groq.chat.completions.create({
     messages: [
       {
@@ -86,12 +100,27 @@ IMPORTANT: Output ONLY the JSON array. Start with [ and end with ].`
       }
     ],
     model: 'gemma2-9b-it',
-    temperature: 0.4, // Slightly higher for more variety on retries
+    temperature: retryTemperature,
     max_tokens: 2000
   })
 
   const responseContent = completion.choices[0]?.message?.content || '[]'
   console.log('AI Response for retry suggestions:', responseContent)
+  
+  // Extract token usage for retry
+  let inputTokens = 0
+  let outputTokens = 0
+  const tokenUsage = extractGroqTokenUsage(completion)
+  if (tokenUsage) {
+    inputTokens = tokenUsage.inputTokens
+    outputTokens = tokenUsage.outputTokens
+  } else {
+    // Estimate if not provided
+    inputTokens = estimateTokenCount(modifiedPrompt + query)
+    outputTokens = estimateTokenCount(responseContent)
+  }
+  
+  const cost = calculateGroqCost(inputTokens + outputTokens)
   
   // Use the same JSON extraction logic
   let jsonContent = responseContent
@@ -135,10 +164,17 @@ IMPORTANT: Output ONLY the JSON array. Start with [ and end with ].`
   }
   
   try {
-    return JSON.parse(jsonContent)
+    const suggestions = JSON.parse(jsonContent)
+    return {
+      suggestions,
+      tokenUsage: { inputTokens, outputTokens, cost }
+    }
   } catch (error) {
     console.error('Error parsing retry suggestions:', error)
-    return []
+    return { 
+      suggestions: [], 
+      tokenUsage: { inputTokens, outputTokens, cost }
+    }
   }
 }
 
@@ -370,8 +406,18 @@ Generate exactly 10 domains as a JSON array with this structure:
 
 IMPORTANT: Output ONLY the JSON array. Start with [ and end with ].`
 
+    // Track total token usage and cost
+    let totalInputTokens = 0
+    let totalOutputTokens = 0
+    let totalGroqCost = 0
+    let domainrRequestCount = 0
+
     // Generate domain suggestions using AI
     let completion
+    const startTime = Date.now()
+    const model = 'gemma2-9b-it'
+    const temperature = 0.3
+    
     try {
       completion = await groq.chat.completions.create({
         messages: [
@@ -386,10 +432,30 @@ IMPORTANT: Output ONLY the JSON array. Start with [ and end with ].`
               `${processedQuery}\n\nREMEMBER: Follow ANY specific domain requirements mentioned above exactly as requested!`
           }
         ],
-        model: 'gemma2-9b-it',
-        temperature: 0.3,
+        model,
+        temperature,
         max_tokens: 2000
       })
+      
+      // Extract token usage
+      const tokenUsage = extractGroqTokenUsage(completion)
+      if (tokenUsage) {
+        totalInputTokens += tokenUsage.inputTokens
+        totalOutputTokens += tokenUsage.outputTokens
+      } else {
+        // Estimate if not provided
+        const promptTokens = estimateTokenCount(fullPrompt + processedQuery)
+        const completionTokens = estimateTokenCount(completion.choices[0]?.message?.content || '')
+        totalInputTokens += promptTokens
+        totalOutputTokens += completionTokens
+      }
+      
+      const responseTime = Date.now() - startTime
+      const cost = calculateGroqCost(totalInputTokens + totalOutputTokens)
+      totalGroqCost += cost
+      
+      // Log initial API usage (will log after search is created)
+      
     } catch (groqError) {
       const error = groqError as { status?: number; message?: string }
       console.error('GROQ API error:', error.status, error.message)
@@ -467,8 +533,18 @@ IMPORTANT: Output ONLY the JSON array. Start with [ and end with ].`
         console.log(`Attempt ${retryCount + 1}: Checking domains...`)
         
         // Get current batch of domains to check
-        const currentBatch = retryCount === 0 ? suggestedDomains : 
-          await generateMoreSuggestions(processedQuery, allSuggestedDomains, currentPrompt, groqApiKey, retryCount)
+        let currentBatch
+        if (retryCount === 0) {
+          currentBatch = suggestedDomains
+        } else {
+          const retryResult = await generateMoreSuggestions(processedQuery, allSuggestedDomains, currentPrompt, groqApiKey, retryCount)
+          currentBatch = retryResult.suggestions
+          
+          // Track token usage for retries
+          totalInputTokens += retryResult.tokenUsage.inputTokens
+          totalOutputTokens += retryResult.tokenUsage.outputTokens
+          totalGroqCost += retryResult.tokenUsage.cost
+        }
         
         console.log(`${retryCount === 0 ? 'Checking' : `Retry ${retryCount}:`} ${currentBatch.length} domains in parallel...`)
         
@@ -505,6 +581,7 @@ IMPORTANT: Output ONLY the JSON array. Start with [ and end with ].`
             
             try {
               const available = await checkDomainAvailability(cleanDomain, domainrApiKey)
+              domainrRequestCount++ // Track Domainr API calls
               
               if (available) {
                 console.log(`✓ Domain ${cleanDomain} is AVAILABLE`)
@@ -585,6 +662,31 @@ IMPORTANT: Output ONLY the JSON array. Start with [ and end with ].`
       let searchId: string | undefined
       try {
         searchId = await trackDomainSearch(sessionId, query, 'suggestion', promptVersionId)
+        
+        // Update search with cost information
+        await updateSearchCosts(searchId, {
+          llmModel: model,
+          llmTemperature: temperature,
+          totalTokens: totalInputTokens + totalOutputTokens,
+          inputTokens: totalInputTokens,
+          outputTokens: totalOutputTokens,
+          groqCost: totalGroqCost,
+          domainrRequests: domainrRequestCount,
+          totalCost: totalGroqCost // For now, only Groq costs (Domainr is free tier)
+        })
+        
+        // Log API usage details
+        await logApiUsage({
+          searchId,
+          provider: 'groq',
+          endpoint: '/chat/completions',
+          model,
+          temperature,
+          inputTokens: totalInputTokens,
+          outputTokens: totalOutputTokens,
+          totalTokens: totalInputTokens + totalOutputTokens,
+          cost: totalGroqCost
+        })
         
         // Track all suggestions with their positions
         await trackDomainSuggestions(
