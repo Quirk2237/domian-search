@@ -581,10 +581,10 @@ IMPORTANT: Output ONLY the JSON array. Start with [ and end with ].`
       // Limit to best 10 available domains
       const finalDomains = uniqueDomains.slice(0, 10)
 
-
       // Track the search and suggestions
+      let searchId: string | undefined
       try {
-        const searchId = await trackDomainSearch(sessionId, query, 'suggestion', promptVersionId)
+        searchId = await trackDomainSearch(sessionId, query, 'suggestion', promptVersionId)
         
         // Track all suggestions with their positions
         await trackDomainSuggestions(

@@ -59,6 +59,9 @@ ANTHROPIC_API_KEY= # Optional: for domain evaluation
 # Domain Services
 DOMAINR_API_KEY=
 
+# Supabase
+NEXT_PUBLIC_SUPABASE_URL=
+NEXT_PUBLIC_SUPABASE_ANON_KEY=
 
 # Database (handled by Supabase CLI)
 # DATABASE_URL is automatically set by Supabase
