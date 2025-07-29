@@ -3,6 +3,7 @@
 import { Check, ExternalLink } from 'lucide-react'
 import { EXTENSION_PRICES } from '@/lib/domain-utils'
 import { motion } from 'framer-motion'
+import { useCallback } from 'react'
 
 interface SuggestionResult {
   domain: string
@@ -31,6 +32,26 @@ const item = {
 }
 
 export function SuggestionResults({ results }: SuggestionResultsProps) {
+  const handleDomainClick = useCallback(async (domain: string) => {
+    try {
+      const sessionId = localStorage.getItem('domain_search_session')
+      if (!sessionId) return
+
+      await fetch('/api/analytics/track', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          domain,
+          sessionId
+        }),
+      })
+    } catch (error) {
+      console.error('Failed to track domain click:', error)
+    }
+  }, [])
+
   return (
     <motion.div 
       className="space-y-3"
@@ -88,6 +109,7 @@ export function SuggestionResults({ results }: SuggestionResultsProps) {
               rel="noopener noreferrer"
               className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
               aria-label={`Register ${result.domain}`}
+              onClick={() => handleDomainClick(result.domain)}
               whileHover={{ scale: 1.1 }}
               whileTap={{ scale: 0.95 }}
             >
