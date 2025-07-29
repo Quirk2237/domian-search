@@ -396,9 +396,44 @@ export async function POST(request: NextRequest) {
     // Get session ID from request headers
     const sessionId = request.headers.get('x-session-id') || getSessionId()
 
+    // Analyze query context using NLP
+    let contextAnalysis = null
+    try {
+      const { getDomainContext } = await import('@/lib/context-detection')
+      contextAnalysis = await getDomainContext(processedQuery)
+      console.log('Context analysis result:', JSON.stringify(contextAnalysis, null, 2))
+    } catch (error) {
+      console.error('Error in context analysis:', error)
+      // Continue without context analysis if it fails
+    }
 
-    // Append output format to the prompt
-    const fullPrompt = currentPrompt + `
+    // Build context-aware prompt
+    let contextSection = ''
+    if (contextAnalysis) {
+      contextSection = `
+
+CONTEXT ANALYSIS RESULTS:
+- Query Type: ${contextAnalysis.type.toUpperCase()} domain
+- Primary Category: ${contextAnalysis.primary_category}
+- Key Entities/Terms: ${contextAnalysis.entity_keywords.join(', ')}
+- Suggested Extensions: ${contextAnalysis.suggested_extensions.join(', ')}
+- Context: ${contextAnalysis.type === 'religious' ? 'Religious/spiritual content - focus on trust, community, learning' :
+             contextAnalysis.type === 'educational' ? 'Educational content - focus on knowledge, authority, accessibility' :
+             contextAnalysis.type === 'business' ? 'Business content - focus on professionalism, efficiency, growth' :
+             contextAnalysis.type === 'tech' ? 'Technology content - focus on innovation, scalability, modern appeal' :
+             contextAnalysis.type === 'creative' ? 'Creative content - focus on inspiration, expression, artistic appeal' :
+             contextAnalysis.type === 'health' ? 'Health/wellness content - focus on care, trust, healing' :
+             'General content - balanced approach'}
+
+CRITICAL REQUIREMENTS FOR THIS QUERY:
+1. MUST incorporate these key terms in domain suggestions: ${contextAnalysis.entity_keywords.slice(0, 3).join(', ')}
+2. PRIORITIZE these extensions: ${contextAnalysis.suggested_extensions.slice(0, 3).join(', ')}
+3. Use ${contextAnalysis.type}-appropriate naming conventions
+4. Ensure domains reflect the ${contextAnalysis.type} context and audience expectations`
+    }
+
+    // Append context information and output format to the prompt
+    const fullPrompt = currentPrompt + contextSection + `
 
 OUTPUT FORMAT:
 Generate exactly 10 domains as a JSON array with this structure:

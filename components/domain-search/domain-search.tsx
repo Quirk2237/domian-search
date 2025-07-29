@@ -3,7 +3,7 @@
 import { useState, useCallback, useEffect, useRef, Suspense } from 'react'
 import debounce from 'lodash.debounce'
 import { Search, Loader2 } from 'lucide-react'
-import { Textarea } from '@/components/ui/textarea'
+import { AutoExpandingInput } from '@/components/ui/auto-expanding-input'
 import { detectSearchMode } from '@/lib/domain-utils'
 import { DomainResults } from './domain-results'
 import { SuggestionResults } from './suggestion-results'
@@ -43,9 +43,8 @@ function DomainSearchInner({ className, onQueryChange, onResultsChange, initialQ
   const [domainResults, setDomainResults] = useState<DomainResult[]>([])
   const [suggestionResults, setSuggestionResults] = useState<SuggestionResult[]>([])
   const [error, setError] = useState<string | null>(null)
+  const [inputHeight, setInputHeight] = useState(56) // Default mobile-friendly height
   const [isSingleLine, setIsSingleLine] = useState(true)
-  const [hasOverflow, setHasOverflow] = useState(false)
-  const [isAtBottom, setIsAtBottom] = useState(true)
   const [currentSearchId, setCurrentSearchId] = useState<string | null>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const abortControllerRef = useRef<AbortController | null>(null)
@@ -224,22 +223,10 @@ function DomainSearchInner({ className, onQueryChange, onResultsChange, initialQ
     }
   }, [query, debouncedSearch])
 
-  // Check for overflow on mount and when query changes
-  useEffect(() => {
-    if (textareaRef.current) {
-      const hasScroll = textareaRef.current.scrollHeight > textareaRef.current.clientHeight
-      setHasOverflow(hasScroll)
-      
-      // Check if at bottom
-      if (hasScroll) {
-        const { scrollTop, scrollHeight, clientHeight } = textareaRef.current
-        const atBottom = scrollTop + clientHeight >= scrollHeight - 5 // 5px threshold
-        setIsAtBottom(atBottom)
-      } else {
-        setIsAtBottom(true)
-      }
-    }
-  }, [query])
+  // Handle height changes for smooth animations
+  const handleHeightChange = useCallback((newHeight: number) => {
+    setInputHeight(newHeight)
+  }, [])
   
   // Notify parent when results change
   useEffect(() => {
@@ -248,81 +235,81 @@ function DomainSearchInner({ className, onQueryChange, onResultsChange, initialQ
       onResultsChange(hasResults)
     }
   }, [domainResults, suggestionResults, onResultsChange])
-  
-  // Handle scroll events
-  const handleScroll = useCallback(() => {
-    if (textareaRef.current && hasOverflow) {
-      const { scrollTop, scrollHeight, clientHeight } = textareaRef.current
-      const atBottom = scrollTop + clientHeight >= scrollHeight - 5 // 5px threshold
-      setIsAtBottom(atBottom)
-    }
-  }, [hasOverflow])
 
   return (
     <div className={cn('w-full max-w-2xl mx-auto', className)}>
       <motion.div 
         className="relative"
-        whileFocus={{ scale: 1.02 }}
+        whileFocus={{ scale: 1.01 }}
         transition={{ type: "spring", stiffness: 300, damping: 30 }}
       >
         <motion.div
-          animate={{ scale: query ? [1, 1.2, 1] : 1 }}
+          animate={{ scale: query ? [1, 1.1, 1] : 1 }}
           transition={{ duration: 0.3 }}
           className={cn(
-            "absolute left-3 z-10",
-            isSingleLine ? "top-1/2 -translate-y-1/2" : "top-3"
+            "absolute left-3 z-10 flex items-center",
+            inputHeight <= 56 ? "top-1/2 -translate-y-1/2" : "top-3"
           )}
         >
           <Search className="text-muted-foreground h-5 w-5" />
         </motion.div>
-        <div className="relative">
-          <Textarea
-            ref={textareaRef}
-            value={query}
-            onChange={(e) => {
-              const newValue = e.target.value
-              setQuery(newValue)
-              // Check if it's single line (no newlines)
-              setIsSingleLine(!newValue.includes('\n'))
-              
-              // Check for overflow
-              if (textareaRef.current) {
-                const hasScroll = textareaRef.current.scrollHeight > textareaRef.current.clientHeight
-                setHasOverflow(hasScroll)
-              }
-              
-              // Call the onQueryChange callback if provided
-              if (onQueryChange) {
-                onQueryChange(newValue)
-              }
-            }}
-            onScroll={handleScroll}
-            className={cn(
-              "pl-10 pr-10 min-h-[40px] sm:min-h-[56px] max-h-[300px] text-sm sm:text-base lg:text-lg rounded-xl shadow-lg border-input focus:border-primary focus:ring-2 focus:ring-primary/20 resize-none overflow-y-auto transition-all duration-300",
-              isSingleLine ? "py-2 sm:py-3 lg:py-4" : "py-1 sm:py-2"
-            )}
-            autoFocus
-            autoComplete="off"
-            autoCorrect="off"
-            autoCapitalize="off"
-            spellCheck={false}
-            onKeyDown={(e) => {
-              // Allow Enter to create new lines instead of submitting
-              if (e.key === 'Enter' && !e.shiftKey) {
-                e.stopPropagation()
-              }
-            }}
-          />
-          {hasOverflow && !isAtBottom && (
-            <div className="absolute bottom-0 left-0 right-0 h-12 bg-gradient-to-t from-background to-transparent pointer-events-none rounded-b-xl" />
+        <motion.div 
+          className={cn(
+            "relative rounded-xl shadow-lg border border-input bg-background",
+            "focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/20",
+            "transition-all duration-200"
           )}
-        </div>
+          animate={{ 
+            borderColor: query ? "var(--primary)" : "var(--border)",
+            boxShadow: query 
+              ? "0 0 0 2px rgba(var(--primary-rgb), 0.1), 0 10px 15px -3px rgba(0, 0, 0, 0.1)" 
+              : "0 10px 15px -3px rgba(0, 0, 0, 0.1)"
+          }}
+          transition={{ duration: 0.2 }}
+        >
+          <div className={cn(
+            "px-10 transition-all duration-200",
+            inputHeight <= 56 ? "py-3 sm:py-4" : "py-3"
+          )}>
+            <AutoExpandingInput
+              ref={textareaRef}
+              value={query}
+              onChange={(e) => {
+                const newValue = e.target.value
+                setQuery(newValue)
+                // Check if it's single line (no newlines)
+                setIsSingleLine(!newValue.includes('\n'))
+                
+                // Call the onQueryChange callback if provided
+                if (onQueryChange) {
+                  onQueryChange(newValue)
+                }
+              }}
+              onHeightChange={handleHeightChange}
+              className="text-sm sm:text-base lg:text-lg placeholder:text-muted-foreground"
+              placeholder="Search domains or describe your business..."
+              minHeight={20}
+              maxHeight={240}
+              autoFocus
+              autoComplete="off"
+              autoCorrect="off"
+              autoCapitalize="off"
+              spellCheck={false}
+              onKeyDown={(e) => {
+                // Allow Enter to create new lines instead of submitting
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.stopPropagation()
+                }
+              }}
+            />
+          </div>
+        </motion.div>
         <AnimatePresence>
           {isLoading && (
             <motion.div
               className={cn(
-                "absolute right-3",
-                isSingleLine ? "top-1/2 -translate-y-1/2" : "top-3"
+                "absolute right-3 z-10 flex items-center",
+                inputHeight <= 56 ? "top-1/2 -translate-y-1/2" : "top-3"
               )}
               initial={{ opacity: 0, scale: 0.8 }}
               animate={{ opacity: 1, scale: 1 }}
