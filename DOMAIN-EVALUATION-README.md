@@ -1,102 +1,145 @@
 # Domain Evaluation System
 
-This system uses Claude to evaluate Groq's domain suggestions against our quality checklist and suggest prompt improvements.
-
-## How to Enable
-
-1. Set your Anthropic API key in `.env.local`:
-   ```
-   ANTHROPIC_API_KEY=your-api-key-here
-   ```
-
-2. Enable evaluation by setting:
-   ```
-   ENABLE_DOMAIN_EVALUATION=true
-   ```
+This system uses Claude to evaluate and score domain suggestions against our quality checklist, storing the results in the database for analysis and optimization.
 
 ## How It Works
 
-When enabled, every domain suggestion request will:
+The evaluation system uses a Supabase Edge Function that:
+1. Automatically triggers after domain suggestions are inserted into the database
+2. Evaluates suggestions against the quality checklist using Claude
+3. Stores detailed scoring and analysis in the `domain_search_scores` table
+4. Enables data-driven optimization of domain suggestion prompts
 
-1. Track all domains that Groq suggests (both available and unavailable)
-2. Send the results to Claude for evaluation
-3. Log detailed feedback to the console including:
-   - Quality scores against our checklist
-   - Analysis of why good domains were unavailable
-   - Specific prompt improvements
-   - A complete improved prompt ready to test
+## Setup
 
-## Console Output Example
+### 1. Set the Anthropic API Key as a Supabase Secret
 
-```
-=== Domain Suggestion Evaluation ===
-Query: "AI recipe app"
-Overall Score: 6.5/10
-Availability Rate: 32%
-
-Checklist Compliance:
-  - length: 7/10 domains meet length criteria
-  - brandability: Only 3/10 are truly brandable
-  - tld: 2/10 are .com (but 5 .com domains were unavailable)
-  - pronunciation: 10/10 pass radio test
-
-Strengths:
-  ✓ Good variety of extensions
-  ✓ All domains are pronounceable
-  ✓ No hyphens or numbers
-
-Weaknesses:
-  ✗ Too many generic descriptive names
-  ✗ Not enough invented brandable names
-  ✗ Average length too long (11.2 chars)
-
-Why good domains were unavailable:
-  - Short, memorable .com domains (recipe.ai, cookbot.com) already taken
-  - Common word combinations are saturated
-  - Need more creative/invented approaches
-
---- SUGGESTED IMPROVED PROMPT ---
-Focus more on invented brandable names, less on literal keywords
-
-Specific changes:
-  ADD: "Generate 70% invented brandable names (like Spotify, Canva)"
-  MODIFY: "Brandability (35%) > Keywords (15%)" 
-  ADD: "Assume common words are taken - be creative"
-  REMOVE: Redundant voice search instructions
-
-Full improved prompt:
-----------------------------------------
-[Complete improved prompt shown here]
-----------------------------------------
-
-Expected improvements:
-  → Higher availability rate (fewer common words)
-  → More memorable, brandable suggestions
-  → Better balance of creativity vs relevance
-=== End Evaluation ===
+```bash
+npx supabase secrets set ANTHROPIC_API_KEY=your-api-key-here
 ```
 
-## Updating the Domain Quality Checklist
+### 2. Deploy the Edge Function
 
-Edit `DOMAIN-QUALITY-CHECKLIST.md` to refine your criteria. The evaluation system will automatically use the updated checklist.
+The `score-domain-search` edge function is already deployed and will automatically trigger via database triggers when new domain suggestions are inserted.
 
-## Testing Prompt Improvements
+### 3. Manual Scoring
 
-1. Copy the improved prompt from the console logs
-2. Replace the current prompt in `/app/api/domains/suggest/route.ts`
-3. Test with the same query to see improvements
-4. Monitor the new evaluation scores
+You can manually score any domain search using the RPC function:
 
-## Performance Impact
+```sql
+-- Score a specific search
+SELECT manually_score_domain_search('search-id-here'::uuid);
 
-- Adds ~1-2 seconds to each request when enabled
-- Only runs in development/testing (disable for production)
-- Evaluation failures don't affect user experience
+-- View scoring results
+SELECT * FROM domain_search_scores WHERE search_id = 'search-id-here';
+```
+
+## Database Schema
+
+### Tables Used
+
+- `domain_searches` - Stores search queries
+- `domain_suggestions` - Stores AI-generated suggestions
+- `quality_checklist_versions` - Contains evaluation criteria
+- `domain_search_scores` - Stores evaluation results
+
+### Scoring Details
+
+The `score_details` JSONB field contains:
+- `overall_score` - Weighted score from 0-10
+- `criteria_scores` - Individual scores for each quality criterion
+- `quality_filters` - Pass/fail for quality checks
+- `naming_techniques_analysis` - Analysis of naming strategies used
+- `industry_relevance_assessment` - How well suggestions match the query
+- `strengths` and `weaknesses` - Key insights
+- `summary` - Overall assessment
+
+## Monitoring & Analysis
+
+### View Recent Scores
+```sql
+SELECT 
+  ds.query,
+  dss.overall_score,
+  dss.score_details->>'summary' as summary,
+  dss.scored_at
+FROM domain_search_scores dss
+JOIN domain_searches ds ON ds.id = dss.search_id
+ORDER BY dss.scored_at DESC
+LIMIT 10;
+```
+
+### Average Scores by Day
+```sql
+SELECT 
+  DATE(scored_at) as date,
+  AVG((overall_score)::numeric) as avg_score,
+  COUNT(*) as searches_scored
+FROM domain_search_scores
+GROUP BY DATE(scored_at)
+ORDER BY date DESC;
+```
+
+### Find Low-Scoring Searches
+```sql
+SELECT 
+  ds.query,
+  dss.overall_score,
+  dss.score_details->'weaknesses' as weaknesses
+FROM domain_search_scores dss
+JOIN domain_searches ds ON ds.id = dss.search_id
+WHERE dss.overall_score < 5
+ORDER BY dss.overall_score ASC;
+```
+
+## Automatic Triggering
+
+The system uses PostgreSQL triggers to automatically score searches:
+- Triggers after 5+ suggestions are inserted
+- Only scores "suggestion" mode searches (not single domain checks)
+- Skips already-scored searches
+- Uses `pg_net` for async HTTP calls to avoid blocking
+
+## Troubleshooting
+
+### Edge Function Errors
+
+Check edge function logs:
+```bash
+npx supabase functions logs score-domain-search
+```
+
+### Missing Scores
+
+Verify the search has suggestions:
+```sql
+SELECT 
+  ds.id,
+  ds.query,
+  COUNT(dsg.id) as suggestion_count,
+  EXISTS(SELECT 1 FROM domain_search_scores WHERE search_id = ds.id) as is_scored
+FROM domain_searches ds
+LEFT JOIN domain_suggestions dsg ON dsg.search_id = ds.id
+WHERE ds.search_mode = 'suggestion'
+GROUP BY ds.id
+HAVING COUNT(dsg.id) > 0 AND NOT EXISTS(SELECT 1 FROM domain_search_scores WHERE search_id = ds.id);
+```
+
+### Re-score Searches
+
+To re-score all unscored searches:
+```sql
+SELECT manually_score_domain_search(id)
+FROM domain_searches ds
+WHERE search_mode = 'suggestion'
+AND EXISTS (SELECT 1 FROM domain_suggestions WHERE search_id = ds.id)
+AND NOT EXISTS (SELECT 1 FROM domain_search_scores WHERE search_id = ds.id);
+```
 
 ## Best Practices
 
-1. Run evaluations on diverse queries to identify patterns
-2. Update the checklist based on real-world learning
-3. Test prompt changes incrementally
-4. Keep track of which prompt versions perform best
-5. Disable evaluation in production (`ENABLE_DOMAIN_EVALUATION=false`)
+1. **Regular Monitoring** - Check scores weekly to identify trends
+2. **Prompt Optimization** - Use low-scoring patterns to improve prompts
+3. **Quality Threshold** - Consider alerts for scores below 6.0
+4. **Checklist Updates** - Evolve criteria based on user feedback
+5. **Performance** - Edge function runs async, no user impact

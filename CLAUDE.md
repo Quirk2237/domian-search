@@ -94,3 +94,30 @@ When making significant updates to the codebase:
    - `git add .` - Stage all changes
    - `git commit -m "feat: add domain search functionality"` - Commit with message
    - `git push origin main` - Push to remote repository
+
+## Documentation Maintenance
+
+### README.md Updates
+The README.md should be kept up-to-date as the project evolves. Update it when:
+- **New features are added** - Add to the Features section
+- **Dependencies change** - Update Tech Stack and installation instructions
+- **Environment variables are added/removed** - Update the Environment Variables section
+- **New scripts are added** - Update Available Scripts section
+- **Project structure changes** - Update the Project Structure diagram
+- **Database schema changes** - Update the Database Schema section
+- **Setup process changes** - Update Getting Started instructions
+- **New routes or endpoints are added** - Update relevant sections
+
+### When to Update
+- After implementing significant features
+- When changing authentication, payment, or API integrations
+- When modifying the build or deployment process
+- When adding new third-party services or APIs
+- When the database schema is modified
+
+### Documentation Standards
+- Keep descriptions concise and accurate
+- Include all required environment variables
+- Test installation instructions on a fresh setup
+- Document any breaking changes prominently
+- Update examples to reflect current implementation

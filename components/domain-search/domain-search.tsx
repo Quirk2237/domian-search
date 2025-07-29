@@ -7,6 +7,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { detectSearchMode } from '@/lib/domain-utils'
 import { DomainResults } from './domain-results'
 import { SuggestionResults } from './suggestion-results'
+import { EvaluationScore } from './evaluation-score'
 import { cn } from '@/lib/utils'
 import { motion, AnimatePresence } from 'framer-motion'
 
@@ -41,6 +42,7 @@ export function DomainSearch({ className, onQueryChange, onResultsChange }: Doma
   const [previousMeaningfulContent, setPreviousMeaningfulContent] = useState('')
   const [hasOverflow, setHasOverflow] = useState(false)
   const [isAtBottom, setIsAtBottom] = useState(true)
+  const [currentSearchId, setCurrentSearchId] = useState<string | null>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
   // Initialize session ID on mount
@@ -98,6 +100,7 @@ export function DomainSearch({ className, onQueryChange, onResultsChange }: Doma
         setSuggestionResults([])
         setError(null)
         setPreviousMeaningfulContent('')
+        setCurrentSearchId(null)
         return
       }
 
@@ -135,6 +138,7 @@ export function DomainSearch({ className, onQueryChange, onResultsChange }: Doma
           
           setDomainResults(data.results)
           setSuggestionResults([])
+          setCurrentSearchId(null) // Domain mode doesn't have scores
         } else {
           const sessionId = localStorage.getItem('domain_search_session')
           const response = await fetch('/api/domains/suggest', {
@@ -155,6 +159,7 @@ export function DomainSearch({ className, onQueryChange, onResultsChange }: Doma
           console.log('Received suggestions:', data.suggestions)
           setSuggestionResults(data.suggestions || [])
           setDomainResults([])
+          setCurrentSearchId(data.searchId || null) // Set the search ID for score polling
         }
       } catch (err) {
         setError(err instanceof Error ? err.message : 'An error occurred')
@@ -329,8 +334,10 @@ export function DomainSearch({ className, onQueryChange, onResultsChange }: Doma
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -20 }}
                   transition={{ duration: 0.3 }}
+                  className="space-y-4"
                 >
                   <SuggestionResults results={suggestionResults} />
+                  <EvaluationScore searchId={currentSearchId} className="mt-6 pt-6 border-t" />
                 </motion.div>
               )}
               {searchMode === 'suggestion' && suggestionResults.length === 0 && (

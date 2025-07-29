@@ -581,42 +581,6 @@ IMPORTANT: Output ONLY the JSON array. Start with [ and end with ].`
       // Limit to best 10 available domains
       const finalDomains = uniqueDomains.slice(0, 10)
 
-      // Evaluate the suggestions if evaluation is enabled
-      if (process.env.ENABLE_DOMAIN_EVALUATION === 'true') {
-        try {
-          // Prepare all attempted domains (including from all retries)
-          const allAttempted = suggestedDomains.concat(
-            ...Array.from({ length: retryCount }, (_, i) => 
-              allSuggestedDomains.slice(suggestedDomains.length + i * 10, suggestedDomains.length + (i + 1) * 10)
-            ).flat()
-          )
-
-          const evaluationPayload = {
-            query: processedQuery,
-            currentPrompt: currentPrompt,
-            results: {
-              suggested: finalDomains,
-              attempted: allAttempted,
-              unavailable: unavailableDomains
-            }
-          }
-
-          // Call evaluation endpoint
-          const evalResponse = await fetch(`${request.nextUrl.origin}/api/domains/evaluate`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(evaluationPayload)
-          })
-
-          if (!evalResponse.ok) {
-            console.error('Evaluation failed:', await evalResponse.text())
-          }
-          // Evaluation results are logged in the evaluate endpoint
-        } catch (evalError) {
-          console.error('Error during domain evaluation:', evalError)
-          // Don't fail the request if evaluation fails
-        }
-      }
 
       // Track the search and suggestions
       try {
@@ -640,7 +604,10 @@ IMPORTANT: Output ONLY the JSON array. Start with [ and end with ].`
       // Cache the results
       cache.set(cacheKey, { data: finalDomains, timestamp: Date.now() })
 
-      return NextResponse.json({ suggestions: finalDomains })
+      return NextResponse.json({ 
+        suggestions: finalDomains,
+        searchId: searchId // Include the search ID for score polling
+      })
     } catch (parseError) {
       console.error('Error parsing AI response:', parseError)
       console.error('Response content:', responseContent)
