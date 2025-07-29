@@ -39,11 +39,12 @@ export function DomainSearch({ className, onQueryChange, onResultsChange }: Doma
   const [suggestionResults, setSuggestionResults] = useState<SuggestionResult[]>([])
   const [error, setError] = useState<string | null>(null)
   const [isSingleLine, setIsSingleLine] = useState(true)
-  const [previousMeaningfulContent, setPreviousMeaningfulContent] = useState('')
   const [hasOverflow, setHasOverflow] = useState(false)
   const [isAtBottom, setIsAtBottom] = useState(true)
   const [currentSearchId, setCurrentSearchId] = useState<string | null>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const abortControllerRef = useRef<AbortController | null>(null)
+  const lastSearchedQuery = useRef<string>('')
 
   // Initialize session ID on mount
   useEffect(() => {
@@ -58,35 +59,6 @@ export function DomainSearch({ className, onQueryChange, onResultsChange }: Doma
     }
   }, [])
 
-  // Function to extract meaningful content
-  const getMeaningfulContent = (text: string): string => {
-    // Common filler words to ignore
-    const fillerWords = new Set([
-      'a', 'an', 'the', 'is', 'are', 'was', 'were', 'been', 'be', 'have', 'has', 
-      'had', 'do', 'does', 'did', 'will', 'would', 'could', 'should', 'may', 
-      'might', 'must', 'can', 'shall', 'to', 'of', 'in', 'for', 'on', 'with', 
-      'at', 'by', 'from', 'about', 'as', 'into', 'through', 'during', 'before', 
-      'after', 'above', 'below', 'between', 'under', 'again', 'further', 'then', 
-      'once', 'and', 'or', 'but', 'if', 'because', 'as', 'until', 'while',
-      'of', 'at', 'by', 'for', 'with', 'about', 'against', 'between', 'into',
-      'through', 'during', 'before', 'after', 'above', 'below', 'to', 'from',
-      'up', 'down', 'in', 'out', 'on', 'off', 'over', 'under', 'again'
-    ])
-    
-    // Remove punctuation and convert to lowercase
-    const words = text.toLowerCase()
-      .replace(/[.,;:!?'"()\[\]{}\-_]+/g, ' ')
-      .trim()
-      .split(/\s+/)
-      .filter(word => word.length > 0)
-    
-    // Filter out filler words and keep only meaningful words
-    const meaningfulWords = words.filter(word => 
-      !fillerWords.has(word) && word.length > 1
-    )
-    
-    return meaningfulWords.join(' ')
-  }
 
   // Create debounced search function
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -99,23 +71,39 @@ export function DomainSearch({ className, onQueryChange, onResultsChange }: Doma
         setDomainResults([])
         setSuggestionResults([])
         setError(null)
-        setPreviousMeaningfulContent('')
+        setCurrentSearchId(null)
+        lastSearchedQuery.current = ''
+        return
+      }
+
+      // Skip if this exact query was just searched
+      if (trimmedQuery === lastSearchedQuery.current) {
+        return
+      }
+
+      const mode = detectSearchMode(trimmedQuery)
+      setSearchMode(mode)
+
+      // For suggestion mode, require at least 3 characters
+      if (mode === 'suggestion' && trimmedQuery.length < 3) {
+        setDomainResults([])
+        setSuggestionResults([])
+        setError(null)
         setCurrentSearchId(null)
         return
       }
 
-      // Check if meaningful content has changed
-      const currentMeaningfulContent = getMeaningfulContent(trimmedQuery)
-      if (currentMeaningfulContent === previousMeaningfulContent) {
-        return // Skip API call if no meaningful change
+      // Cancel any in-flight requests
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort()
       }
-      setPreviousMeaningfulContent(currentMeaningfulContent)
+      abortControllerRef.current = new AbortController()
+
+      // Update last searched query
+      lastSearchedQuery.current = trimmedQuery
 
       setIsLoading(true)
       setError(null)
-
-      const mode = detectSearchMode(trimmedQuery)
-      setSearchMode(mode)
       setLoadingMessage(mode === 'domain' ? 'Checking availability...' : 'Finding perfect domains for you...')
 
       try {
@@ -127,7 +115,8 @@ export function DomainSearch({ className, onQueryChange, onResultsChange }: Doma
               'Content-Type': 'application/json',
               'x-session-id': sessionId || ''
             },
-            body: JSON.stringify({ domain: trimmedQuery })
+            body: JSON.stringify({ domain: trimmedQuery }),
+            signal: abortControllerRef.current.signal
           })
           
           const data = await response.json()
@@ -147,7 +136,8 @@ export function DomainSearch({ className, onQueryChange, onResultsChange }: Doma
               'Content-Type': 'application/json',
               'x-session-id': sessionId || ''
             },
-            body: JSON.stringify({ query: trimmedQuery })
+            body: JSON.stringify({ query: trimmedQuery }),
+            signal: abortControllerRef.current.signal
           })
           
           const data = await response.json()
@@ -162,16 +152,28 @@ export function DomainSearch({ className, onQueryChange, onResultsChange }: Doma
           setCurrentSearchId(data.searchId || null) // Set the search ID for score polling
         }
       } catch (err) {
+        // Ignore abort errors
+        if (err instanceof Error && err.name === 'AbortError') {
+          return
+        }
         setError(err instanceof Error ? err.message : 'An error occurred')
       } finally {
         setIsLoading(false)
       }
-    }, 500), // Increased from 150ms to reduce API calls
+    }, 800), // Increased from 500ms to reduce API calls during typing
     []
   )
 
   useEffect(() => {
     debouncedSearch(query)
+    
+    // Cleanup function
+    return () => {
+      debouncedSearch.cancel()
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort()
+      }
+    }
   }, [query, debouncedSearch])
 
   // Check for overflow on mount and when query changes
