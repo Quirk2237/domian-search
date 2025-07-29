@@ -8,8 +8,12 @@ import { Progress } from '@/components/ui/progress'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { Search, MousePointerClick, Globe, TrendingUp, Clock, DollarSign, Zap } from 'lucide-react'
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
+import { Textarea } from '@/components/ui/textarea'
+import { Button } from '@/components/ui/button'
+import { Switch } from '@/components/ui/switch'
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
+import { Search, MousePointerClick, Globe, TrendingUp, Clock, DollarSign, Zap, GitBranch, ChevronDown, Edit3, Download, FileText, Pause, Play } from 'lucide-react'
 import { useSpring, animated } from '@react-spring/web'
 
 interface StatsData {
@@ -60,6 +64,66 @@ interface SearchHistoryResponse {
   }
 }
 
+interface SystemFlowData {
+  currentState: {
+    prompt: {
+      version: number
+      id: string
+      createdAt: string
+      improvementNotes: string
+      content: string
+    } | null
+    checklist: {
+      version: number
+      id: string
+      createdAt: string
+      content: string
+    } | null
+    improvementTemplate: {
+      version: number
+      id: string
+      createdAt: string
+      content: string
+      notes: string
+    } | null
+  }
+  metrics: {
+    averageRecentScore: string
+    totalSearches: number
+    improvementsTriggered: number
+    improvementRate: string
+    modelDistribution: Record<string, number>
+  }
+  versionHistory: Array<{
+    id: string
+    version: number
+    createdAt: string
+    improvementNotes: string
+    triggerScore: number | null
+    scoreDetails: {
+      criteria_scores?: Record<string, number>
+      quality_filters?: Record<string, boolean>
+      naming_techniques_analysis?: {
+        techniques_used: string[]
+        effectiveness: string
+      }
+      industry_relevance_assessment?: string
+      strengths?: string[]
+      weaknesses?: string[]
+      summary?: string
+    } | null
+  }>
+  recentActivity: Array<{
+    query: string
+    createdAt: string
+    model: string
+    temperature: number
+    score: number | null
+    domainCount: number
+    availableCount: number
+  }>
+}
+
 // Animated counter component
 function AnimatedCounter({ value }: { value: number }) {
   const { number } = useSpring({
@@ -108,6 +172,11 @@ export default function StatsPage() {
   const [searchHistory, setSearchHistory] = useState<SearchHistoryItem[]>([])
   const [searchHistoryLoading, setSearchHistoryLoading] = useState(false)
   const [searchHistoryError, setSearchHistoryError] = useState<string | null>(null)
+  const [systemFlowData, setSystemFlowData] = useState<SystemFlowData | null>(null)
+  const [editingNode, setEditingNode] = useState<{ type: string; id: string; content: string } | null>(null)
+  const [selectedPromptVersion, setSelectedPromptVersion] = useState<{ id: string; content: string } | null>(null)
+  const [evaluationEnabled, setEvaluationEnabled] = useState<boolean | null>(null)
+  const [evaluationLoading, setEvaluationLoading] = useState(false)
 
   useEffect(() => {
     fetchStats()
@@ -136,6 +205,65 @@ export default function StatsPage() {
     } catch (err) {
       console.error('Error fetching cost data:', err)
       // Don't set main error state for cost data failure
+    }
+  }
+
+  const fetchSystemFlowData = async () => {
+    try {
+      const response = await fetch('/api/analytics/system-flow')
+      if (!response.ok) throw new Error('Failed to fetch system flow data')
+      const data = await response.json()
+      setSystemFlowData(data)
+      // Also fetch evaluation setting when loading system flow
+      fetchEvaluationSetting()
+    } catch (err) {
+      console.error('Error fetching system flow data:', err)
+    }
+  }
+
+  const fetchEvaluationSetting = async () => {
+    try {
+      const response = await fetch('/api/settings/evaluation')
+      if (!response.ok) throw new Error('Failed to fetch evaluation setting')
+      const data = await response.json()
+      setEvaluationEnabled(data.enabled)
+    } catch (err) {
+      console.error('Error fetching evaluation setting:', err)
+      // Default to true if error
+      setEvaluationEnabled(true)
+    }
+  }
+
+  const updateEvaluationSetting = async (enabled: boolean) => {
+    setEvaluationLoading(true)
+    try {
+      const response = await fetch('/api/settings/evaluation', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enabled })
+      })
+      if (!response.ok) throw new Error('Failed to update evaluation setting')
+      setEvaluationEnabled(enabled)
+    } catch (err) {
+      console.error('Error updating evaluation setting:', err)
+      // Revert on error
+      setEvaluationEnabled(!enabled)
+    } finally {
+      setEvaluationLoading(false)
+    }
+  }
+
+  const loadPromptVersion = async (versionId: string) => {
+    try {
+      const response = await fetch(`/api/analytics/system-flow?versionId=${versionId}`)
+      if (!response.ok) throw new Error('Failed to fetch version')
+      const data = await response.json()
+      setSelectedPromptVersion({
+        id: data.version.id,
+        content: data.version.prompt_content
+      })
+    } catch (err) {
+      console.error('Error fetching version:', err)
     }
   }
 
@@ -225,6 +353,9 @@ export default function StatsPage() {
           <TabsTrigger value="costs">Costs</TabsTrigger>
           <TabsTrigger value="trends">Trends</TabsTrigger>
           <TabsTrigger value="performance">Performance</TabsTrigger>
+          <TabsTrigger value="systemFlow" onClick={() => !systemFlowData && fetchSystemFlowData()}>
+            Prompts
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview" className="space-y-4">
@@ -629,51 +760,278 @@ export default function StatsPage() {
             </CardContent>
           </Card>
         </TabsContent>
+
+        <TabsContent value="systemFlow" className="space-y-6">
+          {systemFlowData ? (
+            <div className="space-y-6">
+              {/* Header */}
+              <div className="flex justify-between items-center">
+                <h2 className="text-2xl font-bold">System Prompts</h2>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => exportSystemFlowDocumentation()}
+                  className="flex items-center gap-2"
+                >
+                  <Download className="h-4 w-4" />
+                  Export Documentation
+                </Button>
+              </div>
+
+              {/* Flow Modules */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {/* Step 1: Domain Suggestion Prompt */}
+                <motion.div
+                  whileHover={{ scale: 1.02 }}
+                  transition={{ type: "spring", stiffness: 400, damping: 30 }}
+                >
+                  <Card 
+                    className="cursor-pointer hover:shadow-lg transition-shadow h-full"
+                    onClick={() => setEditingNode({
+                      type: 'prompt',
+                      id: systemFlowData.currentState.prompt?.id || '',
+                      content: systemFlowData.currentState.prompt?.content || ''
+                    })}
+                  >
+                    <CardHeader>
+                      <div className="flex items-start justify-between">
+                        <div className="flex items-center gap-2">
+                          <div className="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900/20 flex items-center justify-center text-sm font-semibold">
+                            1
+                          </div>
+                          <div>
+                            <CardTitle className="text-base">Domain Suggestions</CardTitle>
+                            <CardDescription className="text-xs">
+                              Generates AI domain suggestions
+                            </CardDescription>
+                          </div>
+                        </div>
+                        <Badge variant="outline" className="text-xs">
+                          v{systemFlowData.currentState.prompt?.version || 'N/A'}
+                        </Badge>
+                      </div>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-xs text-muted-foreground">
+                        Last updated: {systemFlowData.currentState.prompt?.createdAt ? 
+                          formatRelativeTime(systemFlowData.currentState.prompt.createdAt) : 'Never'}
+                      </div>
+                      <div className="text-xs mt-2 text-muted-foreground">
+                        Click to view and edit
+                      </div>
+                    </CardContent>
+                  </Card>
+                </motion.div>
+
+                {/* Step 2: Quality Checklist */}
+                <motion.div
+                  whileHover={{ scale: 1.02 }}
+                  transition={{ type: "spring", stiffness: 400, damping: 30 }}
+                >
+                  <Card 
+                    className="cursor-pointer hover:shadow-lg transition-shadow h-full"
+                    onClick={() => setEditingNode({
+                      type: 'checklist',
+                      id: systemFlowData.currentState.checklist?.id || '',
+                      content: systemFlowData.currentState.checklist?.content || ''
+                    })}
+                  >
+                    <CardHeader>
+                      <div className="flex items-start justify-between">
+                        <div className="flex items-center gap-2">
+                          <div className="w-8 h-8 rounded-full bg-yellow-100 dark:bg-yellow-900/20 flex items-center justify-center text-sm font-semibold">
+                            2
+                          </div>
+                          <div>
+                            <CardTitle className="text-base">Quality Checklist</CardTitle>
+                            <CardDescription className="text-xs">
+                              Evaluates domain quality
+                            </CardDescription>
+                          </div>
+                        </div>
+                        <Badge variant="outline" className="text-xs">
+                          v{systemFlowData.currentState.checklist?.version || 'N/A'}
+                        </Badge>
+                      </div>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-xs text-muted-foreground">
+                        Last updated: {systemFlowData.currentState.checklist?.createdAt ? 
+                          formatRelativeTime(systemFlowData.currentState.checklist.createdAt) : 'Never'}
+                      </div>
+                      <div className="text-xs mt-2 text-muted-foreground">
+                        Click to view and edit
+                      </div>
+                      
+                      {/* Evaluation Toggle */}
+                      <div 
+                        className="mt-4 pt-4 border-t" 
+                        onClick={(e) => {
+                          e.stopPropagation();
+                        }}
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <label htmlFor="evaluation-toggle" className="text-sm font-medium cursor-pointer">
+                              Auto Evaluation
+                            </label>
+                            {evaluationEnabled === false && (
+                              <Badge variant="secondary" className="text-xs flex items-center gap-1">
+                                <Pause className="h-3 w-3" />
+                                Paused
+                              </Badge>
+                            )}
+                          </div>
+                          <Switch
+                            id="evaluation-toggle"
+                            checked={evaluationEnabled ?? true}
+                            onCheckedChange={(checked) => {
+                              updateEvaluationSetting(checked);
+                            }}
+                            disabled={evaluationLoading || evaluationEnabled === null}
+                          />
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          {evaluationEnabled ? 'Domains are scored and prompts improved automatically' : 'Evaluation and improvement are paused'}
+                        </p>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </motion.div>
+
+                {/* Step 3: Improvement Template */}
+                <motion.div
+                  whileHover={{ scale: 1.02 }}
+                  transition={{ type: "spring", stiffness: 400, damping: 30 }}
+                >
+                  <Card 
+                    className="cursor-pointer hover:shadow-lg transition-shadow h-full"
+                    onClick={() => setEditingNode({
+                      type: 'template',
+                      id: systemFlowData.currentState.improvementTemplate?.id || '',
+                      content: systemFlowData.currentState.improvementTemplate?.content || ''
+                    })}
+                  >
+                    <CardHeader>
+                      <div className="flex items-start justify-between">
+                        <div className="flex items-center gap-2">
+                          <div className="w-8 h-8 rounded-full bg-purple-100 dark:bg-purple-900/20 flex items-center justify-center text-sm font-semibold">
+                            3
+                          </div>
+                          <div>
+                            <CardTitle className="text-base">Improvement Template</CardTitle>
+                            <CardDescription className="text-xs">
+                              Improves prompts when score {'<'} 8
+                            </CardDescription>
+                          </div>
+                        </div>
+                        <Badge variant="outline" className="text-xs">
+                          v{systemFlowData.currentState.improvementTemplate?.version || 'N/A'}
+                        </Badge>
+                      </div>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-xs text-muted-foreground">
+                        Last updated: {systemFlowData.currentState.improvementTemplate?.createdAt ? 
+                          formatRelativeTime(systemFlowData.currentState.improvementTemplate.createdAt) : 'Never'}
+                      </div>
+                      <div className="text-xs mt-2 text-muted-foreground">
+                        Click to view and edit
+                      </div>
+                    </CardContent>
+                  </Card>
+                </motion.div>
+              </div>
+
+              {/* System Metrics Summary */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">System Performance</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
+                    <div>
+                      <div className="text-2xl font-bold">{systemFlowData.metrics.averageRecentScore}/10</div>
+                      <div className="text-xs text-muted-foreground">Avg Score</div>
+                    </div>
+                    <div>
+                      <div className="text-2xl font-bold">{systemFlowData.metrics.totalSearches}</div>
+                      <div className="text-xs text-muted-foreground">Total Searches</div>
+                    </div>
+                    <div>
+                      <div className="text-2xl font-bold">{systemFlowData.metrics.improvementsTriggered}</div>
+                      <div className="text-xs text-muted-foreground">Improvements</div>
+                    </div>
+                    <div>
+                      <div className="text-2xl font-bold">{systemFlowData.metrics.improvementRate}%</div>
+                      <div className="text-xs text-muted-foreground">Improvement Rate</div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          ) : (
+            <Card>
+              <CardContent className="pt-6">
+                <div className="flex items-center justify-center space-x-2">
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
+                  <p className="text-muted-foreground">Loading prompts...</p>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </TabsContent>
       </Tabs>
 
       {/* Search History Dialog */}
       <Dialog open={searchHistoryOpen} onOpenChange={setSearchHistoryOpen}>
-        <DialogContent className="sm:max-w-[600px] max-h-[80vh]">
-          <DialogHeader>
-            <DialogTitle>Search History</DialogTitle>
-            <DialogDescription>
-              Recent domain searches
-            </DialogDescription>
-          </DialogHeader>
-          
-          <div className="mt-6 space-y-4 max-h-[calc(100vh-200px)] overflow-y-auto">
-            {searchHistoryLoading ? (
-              <>
-                {[...Array(5)].map((_, i) => (
-                  <div key={i} className="space-y-2">
-                    <Skeleton className="h-4 w-3/4" />
-                    <Skeleton className="h-3 w-1/4" />
-                  </div>
-                ))}
-              </>
-            ) : searchHistoryError ? (
-              <div className="text-destructive text-sm">
-                {searchHistoryError}
-              </div>
-            ) : searchHistory.length === 0 ? (
-              <div className="text-muted-foreground text-sm">
-                No search history available
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {searchHistory.map((search) => (
-                  <motion.div
-                    key={search.id}
-                    initial={{ opacity: 0, x: -20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    className="p-3 rounded-lg border hover:bg-muted/50 transition-colors"
-                  >
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="flex-1 min-w-0">
-                        <p className="font-medium text-sm truncate">
+        <DialogContent className="max-w-[calc(100vw-2rem)] sm:max-w-[600px] p-0 gap-0">
+          <div className="flex flex-col h-[min(85vh,600px)]">
+            <DialogHeader className="flex-shrink-0 px-4 sm:px-6 pt-6 pb-4 border-b">
+              <DialogTitle>Search History</DialogTitle>
+              <DialogDescription>
+                Recent domain searches
+              </DialogDescription>
+            </DialogHeader>
+            
+            <div className="flex-1 overflow-y-auto overscroll-contain" style={{ WebkitOverflowScrolling: 'touch' }}>
+              <div className="px-4 sm:px-6 py-4">
+              {searchHistoryLoading ? (
+                <div className="space-y-4">
+                  {[...Array(5)].map((_, i) => (
+                    <div key={i} className="space-y-2">
+                      <Skeleton className="h-4 w-3/4" />
+                      <Skeleton className="h-3 w-1/4" />
+                    </div>
+                  ))}
+                </div>
+              ) : searchHistoryError ? (
+                <div className="text-destructive text-sm p-4 text-center">
+                  {searchHistoryError}
+                </div>
+              ) : searchHistory.length === 0 ? (
+                <div className="text-muted-foreground text-sm p-4 text-center">
+                  No search history available
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {searchHistory.map((search, index) => (
+                    <motion.div
+                      key={search.id}
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ 
+                        delay: index * 0.05,
+                        duration: 0.3,
+                        ease: "easeOut"
+                      }}
+                      className="p-4 rounded-lg border hover:bg-muted/50 transition-colors"
+                    >
+                      <div className="space-y-2">
+                        <p className="font-medium text-sm break-words">
                           {search.query}
                         </p>
-                        <div className="flex items-center gap-2 mt-1">
+                        <div className="flex flex-wrap gap-2">
                           <Badge 
                             variant="outline" 
                             className="text-xs"
@@ -681,19 +1039,243 @@ export default function StatsPage() {
                             {search.search_mode === 'domain' ? 'Domain Check' : 'AI Suggestions'}
                           </Badge>
                           <span className="text-xs text-muted-foreground flex items-center gap-1">
-                            <Clock className="h-3 w-3" />
+                            <Clock className="h-3 w-3 flex-shrink-0" />
                             {formatRelativeTime(search.created_at)}
                           </span>
                         </div>
                       </div>
-                    </div>
-                  </motion.div>
-                ))}
+                    </motion.div>
+                  ))}
+                </div>
+              )}
               </div>
-            )}
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Dialog */}
+      <Dialog open={!!editingNode} onOpenChange={(open) => {
+        if (!open) {
+          setEditingNode(null)
+          setSelectedPromptVersion(null)
+        }
+      }}>
+        <DialogContent className="max-w-[calc(100vw-2rem)] sm:max-w-[900px] p-0 gap-0">
+          <div className="flex flex-col h-[min(90vh,700px)]">
+            <DialogHeader className="flex-shrink-0 px-4 sm:px-6 pt-6 pb-4 border-b">
+              <DialogTitle>
+                {editingNode?.type === 'prompt' ? 'Domain Suggestion Prompt' : 
+                 editingNode?.type === 'checklist' ? 'Quality Checklist' : 
+                 'Improvement Template'}
+              </DialogTitle>
+              <DialogDescription>
+                View and edit the {editingNode?.type}. Changes will create a new version.
+              </DialogDescription>
+            </DialogHeader>
+            
+            <div className="flex-1 overflow-y-auto overscroll-contain" style={{ WebkitOverflowScrolling: 'touch' }}>
+              <div className="px-4 sm:px-6 py-4 space-y-4">
+              {/* Version selector for prompts */}
+              {editingNode?.type === 'prompt' && systemFlowData && (
+                <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
+                  <label className="text-sm font-medium">Version:</label>
+                  <div className="flex flex-col sm:flex-row gap-2 sm:gap-4 flex-1">
+                    <select 
+                      className="text-sm border rounded px-3 py-2 w-full sm:w-auto"
+                      onChange={(e) => {
+                        const selectedVersion = systemFlowData.versionHistory.find(v => v.version === parseInt(e.target.value))
+                        if (selectedVersion && selectedVersion.id) {
+                          loadPromptVersion(selectedVersion.id)
+                        }
+                      }}
+                      value={selectedPromptVersion ? 
+                        systemFlowData.versionHistory.find(v => v.id === selectedPromptVersion.id)?.version : 
+                        systemFlowData.currentState.prompt?.version}
+                    >
+                      {systemFlowData.versionHistory.map(v => (
+                        <option key={v.version} value={v.version}>
+                          v{v.version} {v.version === systemFlowData.currentState.prompt?.version && '(active)'}
+                          {v.improvementNotes && ` - ${v.improvementNotes.slice(0, 30)}...`}
+                        </option>
+                      ))}
+                    </select>
+                    {selectedPromptVersion && selectedPromptVersion.id !== systemFlowData.currentState.prompt?.id && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="w-full sm:w-auto"
+                        onClick={async () => {
+                          if (confirm('Make this version active?')) {
+                            const response = await fetch('/api/analytics/system-flow', {
+                              method: 'POST',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({
+                                type: 'activate',
+                                id: selectedPromptVersion.id
+                              })
+                            })
+                            if (response.ok) {
+                              setSelectedPromptVersion(null)
+                              setEditingNode(null)
+                              fetchSystemFlowData()
+                            }
+                          }
+                        }}
+                      >
+                        Make Active
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Content editor */}
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Content:</label>
+                <Textarea
+                  value={editingNode?.type === 'prompt' && selectedPromptVersion ? 
+                    selectedPromptVersion.content : 
+                    editingNode?.content || ''}
+                  onChange={(e) => {
+                    if (editingNode?.type === 'prompt' && selectedPromptVersion) {
+                      setSelectedPromptVersion({ ...selectedPromptVersion, content: e.target.value })
+                    } else {
+                      setEditingNode(editingNode ? { ...editingNode, content: e.target.value } : null)
+                    }
+                  }}
+                  className="min-h-[300px] sm:min-h-[400px] font-mono text-xs sm:text-sm resize-none"
+                  placeholder="Enter content..."
+                />
+                </div>
+              </div>
+            </div>
+            
+            <DialogFooter className="flex-shrink-0 border-t px-4 sm:px-6 py-4">
+            <div className="flex flex-col-reverse sm:flex-row gap-2 w-full">
+              <div className="flex-1">
+                {editingNode?.type === 'prompt' && systemFlowData?.currentState.prompt && (
+                  <span className="text-xs text-muted-foreground">
+                    Active: v{systemFlowData.currentState.prompt.version}
+                  </span>
+                )}
+              </div>
+              <div className="flex gap-2 w-full sm:w-auto">
+                <Button
+                  variant="outline"
+                  className="flex-1 sm:flex-initial"
+                  onClick={() => {
+                    setEditingNode(null)
+                    setSelectedPromptVersion(null)
+                  }}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  className="flex-1 sm:flex-initial"
+                  onClick={async () => {
+                    if (!editingNode) return
+                    
+                    const content = editingNode.type === 'prompt' && selectedPromptVersion ? 
+                      selectedPromptVersion.content : 
+                      editingNode.content
+                    
+                    try {
+                      const response = await fetch('/api/analytics/system-flow', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                          type: editingNode.type,
+                          id: editingNode.id,
+                          content: content,
+                          notes: `Updated via System Flow UI`
+                        })
+                      })
+                      
+                      if (response.ok) {
+                        setEditingNode(null)
+                        setSelectedPromptVersion(null)
+                        fetchSystemFlowData()
+                      } else {
+                        console.error('Failed to update')
+                      }
+                    } catch (error) {
+                      console.error('Error updating:', error)
+                    }
+                  }}
+                >
+                  Save New Version
+                </Button>
+              </div>
+            </div>
+            </DialogFooter>
           </div>
         </DialogContent>
       </Dialog>
     </div>
   )
+}
+
+// Export function
+function exportSystemFlowDocumentation() {
+  // This would be implemented to fetch the current state and generate markdown
+  fetch('/api/analytics/system-flow')
+    .then(res => res.json())
+    .then(data => {
+      const markdown = generateMarkdownDocumentation(data)
+      const blob = new Blob([markdown], { type: 'text/markdown' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `domain-system-flow-${new Date().toISOString().split('T')[0]}.md`
+      a.click()
+      URL.revokeObjectURL(url)
+    })
+}
+
+function generateMarkdownDocumentation(data: SystemFlowData): string {
+  return `# Domain Search System Flow Documentation
+Generated: ${new Date().toISOString()}
+
+## Active Components
+
+### Domain Suggestion Prompt (v${data.currentState.prompt?.version || 'N/A'})
+Model: ${Object.keys(data.metrics.modelDistribution)[0] || 'gemma2-9b-it'}
+
+\`\`\`
+${data.currentState.prompt?.content || 'No prompt content available'}
+\`\`\`
+
+### Quality Checklist (v${data.currentState.checklist?.version || 'N/A'})
+\`\`\`
+${data.currentState.checklist?.content || 'No checklist content available'}
+\`\`\`
+
+### Improvement Template (v${data.currentState.improvementTemplate?.version || 'N/A'})
+\`\`\`
+${data.currentState.improvementTemplate?.content || 'No template content available'}
+\`\`\`
+
+## System Flow
+1. User searches → AI generates domains using prompt v${data.currentState.prompt?.version || 'N/A'}
+2. Domains scored against checklist v${data.currentState.checklist?.version || 'N/A'}
+3. If score < 8.0 → Improvement triggered using template v${data.currentState.improvementTemplate?.version || 'N/A'}
+4. New prompt version created and activated
+
+## Recent Performance
+- Average Score: ${data.metrics.averageRecentScore}/10
+- Total Searches: ${data.metrics.totalSearches}
+- Improvements Triggered: ${data.metrics.improvementsTriggered}
+- Improvement Rate: ${data.metrics.improvementRate}%
+
+## Version History
+${data.versionHistory.slice(0, 5).map(v => 
+  `- v${v.version}: ${v.improvementNotes || 'Initial version'} (Score: ${v.triggerScore || 'N/A'})`
+).join('\n')}
+
+## Model Distribution
+${Object.entries(data.metrics.modelDistribution).map(([model, count]) => 
+  `- ${model}: ${count} searches`
+).join('\n')}
+`
 }

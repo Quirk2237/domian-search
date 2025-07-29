@@ -1,9 +1,10 @@
 'use client'
 
-import { Check, X, ExternalLink } from 'lucide-react'
+import { Check, X, ExternalLink, Share2 } from 'lucide-react'
 import { EXTENSION_PRICES } from '@/lib/domain-utils'
-import { motion } from 'framer-motion'
+import { motion, useReducedMotion } from 'framer-motion'
 import { useCallback } from 'react'
+import { toast } from 'sonner'
 
 interface DomainResult {
   domain: string
@@ -15,6 +16,7 @@ interface DomainResult {
 
 interface DomainResultsProps {
   results: DomainResult[]
+  searchQuery?: string
 }
 
 const container = {
@@ -32,7 +34,9 @@ const item = {
   show: { opacity: 1, x: 0 }
 }
 
-export function DomainResults({ results }: DomainResultsProps) {
+export function DomainResults({ results, searchQuery }: DomainResultsProps) {
+  const shouldReduceMotion = useReducedMotion()
+  
   // Sort results: requested first (if any), then exact matches, then suggestions
   const sortedResults = [...results].sort((a, b) => {
     if (a.requested) return -1
@@ -63,6 +67,17 @@ export function DomainResults({ results }: DomainResultsProps) {
     }
   }, [])
   
+  const handleShare = useCallback(async () => {
+    try {
+      const url = window.location.href
+      await navigator.clipboard.writeText(url)
+      toast.success('Link copied to clipboard!')
+    } catch (error) {
+      toast.error('Failed to copy link')
+      console.error('Error copying to clipboard:', error)
+    }
+  }, [])
+  
   return (
     <motion.div 
       className="space-y-3"
@@ -70,57 +85,80 @@ export function DomainResults({ results }: DomainResultsProps) {
       initial="hidden"
       animate="show"
     >
-      <motion.h3 
-        className="text-sm font-medium text-muted-foreground mb-4"
+      <motion.div 
+        className="flex items-center justify-between mb-4"
         variants={item}
       >
-        Available Domains
-      </motion.h3>
+        <h3 className="text-sm font-medium text-muted-foreground">
+          Available Domains
+        </h3>
+        {searchQuery && (
+          <motion.button
+            onClick={handleShare}
+            className="p-2 text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg transition-colors"
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            aria-label="Share search results"
+          >
+            <Share2 className="h-4 w-4" />
+          </motion.button>
+        )}
+      </motion.div>
       
       {sortedResults.map((result, index) => (
         <motion.div
           key={result.domain}
-          className={`flex items-center justify-between p-4 rounded-lg min-h-[56px] ${
+          className={`flex flex-col sm:flex-row sm:items-center sm:justify-between p-4 rounded-lg min-h-[64px] gap-3 ${
             result.requested && !result.available 
               ? 'bg-red-50 border-2 border-red-200'
               : 'bg-card border border-border'
           }`}
           variants={item}
-          whileHover={{ 
+          whileHover={shouldReduceMotion ? {} : { 
             scale: 1.02,
             boxShadow: "0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)"
           }}
-          transition={{ type: "spring", stiffness: 300, damping: 25 }}
+          whileTap={shouldReduceMotion ? {} : { scale: 0.99 }}
+          transition={shouldReduceMotion ? {} : { type: "spring", stiffness: 300, damping: 25 }}
         >
-          <div className="flex items-center space-x-3">
-            {result.available ? (
-              <Check className="h-5 w-5 text-green-500 flex-shrink-0" />
-            ) : (
-              <X className="h-5 w-5 text-red-500 flex-shrink-0" />
-            )}
-            <span className={`text-lg ${
+          <div className="flex items-center gap-3">
+            <motion.div
+              initial={{ scale: 0 }}
+              animate={{ scale: 1 }}
+              transition={{ delay: index * 0.05 + 0.1, type: "spring", stiffness: 400, damping: 20 }}
+              className="flex-shrink-0"
+            >
+              {result.available ? (
+                <Check className="h-5 w-5 text-green-500" />
+              ) : (
+                <X className="h-5 w-5 text-red-500" />
+              )}
+            </motion.div>
+            <span className={`text-lg font-medium ${
               result.available ? 'text-foreground' : 'text-muted-foreground'
-            }`}>
+            } truncate`}>
               {result.domain}
             </span>
           </div>
           
-          <div className="flex items-center space-x-4">
+          <div className="flex items-center justify-between sm:justify-end gap-4 sm:ml-4 pl-8 sm:pl-0">
             {result.available && (
               <>
-                <span className="text-lg font-medium text-foreground">
+                <span className="text-lg font-semibold text-foreground whitespace-nowrap">
                   ${EXTENSION_PRICES[result.extension] || 29.99}/year
                 </span>
-                <a
+                <motion.a
                   href={`https://www.namecheap.com/domains/registration/results/?domain=${result.domain}`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                  className="p-3 sm:p-2.5 text-blue-600 hover:bg-blue-50 active:bg-blue-100 rounded-lg transition-colors touch-manipulation"
                   aria-label={`Register ${result.domain}`}
                   onClick={() => trackClick(result.domain)}
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
                 >
                   <ExternalLink className="h-5 w-5" />
-                </a>
+                </motion.a>
               </>
             )}
             {!result.available && (

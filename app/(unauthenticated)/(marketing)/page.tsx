@@ -3,8 +3,9 @@
 import { DomainSearch } from '@/components/domain-search/domain-search'
 import { motion, AnimatePresence } from 'framer-motion'
 import { ThemeToggle } from '@/components/theme-toggle'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { cn } from '@/lib/utils'
+import { useSearchParams } from 'next/navigation'
 
 const fadeInUp = {
   initial: { opacity: 0, y: 20 },
@@ -15,6 +16,18 @@ const fadeInUp = {
 export default function MarketingPage() {
   const [hasContent, setHasContent] = useState(false)
   const [hasResults, setHasResults] = useState(false)
+  const searchParams = useSearchParams()
+  
+  // Get initial values from URL
+  const initialQuery = searchParams.get('q') || ''
+  const initialMode = searchParams.get('mode') as 'domain' | 'suggestion' | null
+  
+  // Set initial hasContent based on URL params
+  useEffect(() => {
+    if (initialQuery) {
+      setHasContent(true)
+    }
+  }, [initialQuery])
   
   const handleQueryChange = (query: string) => {
     setHasContent(query.trim().length > 0)
@@ -94,7 +107,13 @@ export default function MarketingPage() {
             damping: 30
           }}
         >
-          <DomainSearch className="mb-16" onQueryChange={handleQueryChange} onResultsChange={handleResultsChange} />
+          <DomainSearch 
+            className="mb-16" 
+            onQueryChange={handleQueryChange} 
+            onResultsChange={handleResultsChange}
+            initialQuery={initialQuery}
+            initialMode={initialMode || undefined}
+          />
         </motion.div>
         
         <AnimatePresence>

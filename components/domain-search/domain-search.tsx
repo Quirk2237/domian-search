@@ -10,11 +10,14 @@ import { SuggestionResults } from './suggestion-results'
 import { EvaluationScore } from './evaluation-score'
 import { cn } from '@/lib/utils'
 import { motion, AnimatePresence } from 'framer-motion'
+import { useSearchParams } from 'next/navigation'
 
 interface DomainSearchProps {
   className?: string
   onQueryChange?: (query: string) => void
   onResultsChange?: (hasResults: boolean) => void
+  initialQuery?: string
+  initialMode?: 'domain' | 'suggestion'
 }
 
 interface DomainResult {
@@ -30,9 +33,9 @@ interface SuggestionResult {
   reason?: string
 }
 
-export function DomainSearch({ className, onQueryChange, onResultsChange }: DomainSearchProps) {
-  const [query, setQuery] = useState('')
-  const [searchMode, setSearchMode] = useState<'domain' | 'suggestion'>('domain')
+export function DomainSearch({ className, onQueryChange, onResultsChange, initialQuery = '', initialMode }: DomainSearchProps) {
+  const [query, setQuery] = useState(initialQuery)
+  const [searchMode, setSearchMode] = useState<'domain' | 'suggestion'>(initialMode || 'domain')
   const [isLoading, setIsLoading] = useState(false)
   const [loadingMessage, setLoadingMessage] = useState('Searching...')
   const [domainResults, setDomainResults] = useState<DomainResult[]>([])
@@ -45,6 +48,8 @@ export function DomainSearch({ className, onQueryChange, onResultsChange }: Doma
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const abortControllerRef = useRef<AbortController | null>(null)
   const lastSearchedQuery = useRef<string>('')
+  const searchParams = useSearchParams()
+  const isInitialLoad = useRef(true)
 
   // Initialize session ID on mount
   useEffect(() => {
@@ -60,10 +65,27 @@ export function DomainSearch({ className, onQueryChange, onResultsChange }: Doma
   }, [])
 
 
+  // Update URL with search parameters
+  const updateURL = useCallback((searchQuery: string, mode: 'domain' | 'suggestion') => {
+    const params = new URLSearchParams(searchParams.toString())
+    
+    if (searchQuery) {
+      params.set('q', searchQuery)
+      params.set('mode', mode)
+    } else {
+      params.delete('q')
+      params.delete('mode')
+    }
+    
+    const newURL = params.toString() ? `?${params.toString()}` : window.location.pathname
+    // Use replaceState to avoid navigation and history changes
+    window.history.replaceState({}, '', newURL)
+  }, [searchParams])
+
   // Create debounced search function
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const debouncedSearch = useCallback(
-    debounce(async (searchQuery: string) => {
+    debounce(async (searchQuery: string, skipURLUpdate = false) => {
       // Get the actual content without just whitespace/newlines
       const trimmedQuery = searchQuery.trim()
       
@@ -73,6 +95,7 @@ export function DomainSearch({ className, onQueryChange, onResultsChange }: Doma
         setError(null)
         setCurrentSearchId(null)
         lastSearchedQuery.current = ''
+        if (!skipURLUpdate) updateURL('', 'domain')
         return
       }
 
@@ -128,6 +151,9 @@ export function DomainSearch({ className, onQueryChange, onResultsChange }: Doma
           setDomainResults(data.results)
           setSuggestionResults([])
           setCurrentSearchId(null) // Domain mode doesn't have scores
+          
+          // Update URL after successful results
+          if (!skipURLUpdate) updateURL(trimmedQuery, mode)
         } else {
           const sessionId = localStorage.getItem('domain_search_session')
           const response = await fetch('/api/domains/suggest', {
@@ -150,6 +176,9 @@ export function DomainSearch({ className, onQueryChange, onResultsChange }: Doma
           setSuggestionResults(data.suggestions || [])
           setDomainResults([])
           setCurrentSearchId(data.searchId || null) // Set the search ID for score polling
+          
+          // Update URL after successful results
+          if (!skipURLUpdate) updateURL(trimmedQuery, mode)
         }
       } catch (err) {
         // Ignore abort errors
@@ -161,10 +190,27 @@ export function DomainSearch({ className, onQueryChange, onResultsChange }: Doma
         setIsLoading(false)
       }
     }, 800), // Increased from 500ms to reduce API calls during typing
-    []
+    [updateURL]
   )
 
+  // Handle initial load from URL parameters
   useEffect(() => {
+    if (isInitialLoad.current && initialQuery) {
+      isInitialLoad.current = false
+      // Set initial mode based on query
+      const mode = detectSearchMode(initialQuery)
+      setSearchMode(mode)
+      setIsSingleLine(!initialQuery.includes('\n'))
+      // Skip URL update on initial load since we're loading from URL
+      debouncedSearch(initialQuery, true)
+    } else if (isInitialLoad.current) {
+      // No initial query, mark as loaded
+      isInitialLoad.current = false
+    }
+  }, [initialQuery, debouncedSearch])
+
+  useEffect(() => {
+    // Always trigger search when query changes
     debouncedSearch(query)
     
     // Cleanup function
@@ -326,7 +372,7 @@ export function DomainSearch({ className, onQueryChange, onResultsChange }: Doma
                   exit={{ opacity: 0, y: -20 }}
                   transition={{ duration: 0.3 }}
                 >
-                  <DomainResults results={domainResults} />
+                  <DomainResults results={domainResults} searchQuery={query.trim()} />
                 </motion.div>
               )}
               {searchMode === 'suggestion' && suggestionResults.length > 0 && (
@@ -338,7 +384,7 @@ export function DomainSearch({ className, onQueryChange, onResultsChange }: Doma
                   transition={{ duration: 0.3 }}
                   className="space-y-4"
                 >
-                  <SuggestionResults results={suggestionResults} />
+                  <SuggestionResults results={suggestionResults} searchQuery={query.trim()} />
                   <EvaluationScore searchId={currentSearchId} className="mt-6 pt-6 border-t" />
                 </motion.div>
               )}
