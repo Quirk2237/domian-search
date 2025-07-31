@@ -58,16 +58,21 @@ export function BookmarksDisplay({ className }: BookmarksDisplayProps) {
   const [authDialogOpen, setAuthDialogOpen] = useState(false)
   const [checkingAvailability, setCheckingAvailability] = useState<Set<string>>(new Set())
 
+  // Debug logging
+  console.log('BookmarksDisplay - user:', user)
+  console.log('BookmarksDisplay - loading:', loading)
+  console.log('BookmarksDisplay - bookmarks:', bookmarks)
+
   // Convert bookmarks to display format
   const bookmarkedDomains: BookmarkedDomain[] = bookmarks.map(bookmark => ({
     id: bookmark.id,
-    domain: `${bookmark.domain}.${bookmark.extension}`,
-    extension: bookmark.extension,
+    domain: `${bookmark.domain}${bookmark.extension}`,
+    extension: bookmark.extension.startsWith('.') ? bookmark.extension.slice(1) : bookmark.extension,
     bookmarkedAt: new Date(bookmark.created_at),
     // We'll add availability checking later
     available: undefined,
     isPremium: false,
-    price: EXTENSION_PRICES[bookmark.extension] || 29.99
+    price: EXTENSION_PRICES[bookmark.extension.startsWith('.') ? bookmark.extension.slice(1) : bookmark.extension] || 29.99
   }))
 
   const trackClick = useCallback(async (domain: string) => {
