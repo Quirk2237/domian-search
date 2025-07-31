@@ -178,7 +178,7 @@ function DomainSearchInner({ className, onQueryChange, onResultsChange, initialQ
       } finally {
         setIsLoading(false)
       }
-  }, [query, updateURL, domainResults.length, suggestionResults.length])
+  }, [query, updateURL])
 
   // Handle initial load from URL parameters
   useEffect(() => {

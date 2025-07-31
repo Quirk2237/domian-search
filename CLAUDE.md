@@ -32,6 +32,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - `npx shadcn@latest add [component-name]` - Install new Shadcn UI components
 - **When to use**: Use the MCP shadcn tools to preview component source code and demos before installing. This helps verify the component meets requirements and understand its API/props before adding to the project.
 
+## Design System
+
+### Colors
+- **Accent Color**: `#9F7BE7` - Primary accent color used for interactive elements, selected states, and emphasis
+
 ## Architecture
 
 This is a Next.js 15 SaaS template using the App Router with clear separation between authenticated and unauthenticated routes.

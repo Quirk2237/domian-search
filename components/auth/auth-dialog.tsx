@@ -56,7 +56,7 @@ export function AuthDialog({ open, onOpenChange }: AuthDialogProps) {
     } catch (err) {
       if (err instanceof z.ZodError) {
         const fieldErrors: Partial<SignInForm> = {}
-        err.errors.forEach((error) => {
+        err.issues.forEach((error) => {
           const field = error.path[0] as keyof SignInForm
           fieldErrors[field] = error.message
         })
@@ -74,7 +74,7 @@ export function AuthDialog({ open, onOpenChange }: AuthDialogProps) {
     } catch (err) {
       if (err instanceof z.ZodError) {
         const fieldErrors: Partial<SignUpForm> = {}
-        err.errors.forEach((error) => {
+        err.issues.forEach((error) => {
           const field = error.path[0] as keyof SignUpForm
           fieldErrors[field] = error.message
         })
@@ -175,7 +175,7 @@ export function AuthDialog({ open, onOpenChange }: AuthDialogProps) {
     visible: { 
       opacity: 1, 
       x: 0,
-      transition: { duration: 0.3, ease: "easeOut" }
+      transition: { duration: 0.3, ease: "easeOut" as const }
     }
   }
 
@@ -184,14 +184,14 @@ export function AuthDialog({ open, onOpenChange }: AuthDialogProps) {
     visible: { 
       opacity: 1, 
       scale: 1, 
-      height: "auto",
-      transition: { duration: 0.2, ease: "easeOut" }
+      height: "auto" as const,
+      transition: { duration: 0.2, ease: "easeOut" as const }
     },
     exit: { 
       opacity: 0, 
       scale: 0.95, 
       height: 0,
-      transition: { duration: 0.15, ease: "easeIn" }
+      transition: { duration: 0.15, ease: "easeIn" as const }
     }
   }
 

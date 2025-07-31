@@ -1,6 +1,7 @@
 'use client'
 
 import { DomainSearch } from '@/components/domain-search/domain-search'
+import { DomainSearchWithTabs } from '@/components/domain-search/domain-search-with-tabs'
 import { motion, AnimatePresence } from 'framer-motion'
 import { ThemeToggle } from '@/components/theme-toggle'
 import { AuthButton } from '@/components/auth/auth-button'
@@ -8,8 +9,6 @@ import { useState, useEffect, Suspense } from 'react'
 import { cn } from '@/lib/utils'
 import { useSearchParams } from 'next/navigation'
 import { useAuth } from '@/hooks/use-auth'
-import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
-import { Search, Bookmark } from 'lucide-react'
 
 const fadeInUp = {
   initial: { opacity: 0, y: 20 },
@@ -133,45 +132,13 @@ function MarketingContent() {
           }}
         >
           {user && !authLoading ? (
-            <Tabs defaultValue="search" className="w-full">
-              <TabsList className="grid w-full max-w-md mx-auto grid-cols-2 mb-6">
-                <TabsTrigger value="search" className="flex items-center gap-2">
-                  <Search className="h-4 w-4" />
-                  Search
-                </TabsTrigger>
-                <TabsTrigger value="bookmarks" className="flex items-center gap-2">
-                  <Bookmark className="h-4 w-4" />
-                  Bookmarks
-                </TabsTrigger>
-              </TabsList>
-              
-              <TabsContent value="search" className="mt-0">
-                <DomainSearch 
-                  className="mb-16" 
-                  onQueryChange={handleQueryChange} 
-                  onResultsChange={handleResultsChange}
-                  initialQuery={initialQuery}
-                  initialMode={initialMode || undefined}
-                />
-              </TabsContent>
-              
-              <TabsContent value="bookmarks" className="mt-0">
-                <motion.div
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.3 }}
-                  className="text-center py-16"
-                >
-                  <Bookmark className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                  <p className="text-lg text-muted-foreground">
-                    Your bookmarked domains will appear here
-                  </p>
-                  <p className="text-sm text-muted-foreground mt-2">
-                    Coming soon...
-                  </p>
-                </motion.div>
-              </TabsContent>
-            </Tabs>
+            <DomainSearchWithTabs 
+              className="mb-16" 
+              onQueryChange={handleQueryChange} 
+              onResultsChange={handleResultsChange}
+              initialQuery={initialQuery}
+              initialMode={initialMode || undefined}
+            />
           ) : (
             <DomainSearch 
               className="mb-16" 
