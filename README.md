@@ -8,7 +8,7 @@ A modern AI-powered domain name search and suggestion platform built with Next.j
 - **Smart Search Auto-Detection**
   - Single word → Domain availability checking across multiple TLDs
   - Multiple words → AI-powered domain name suggestions
-- **Real-time Domain Availability** - Instant checking via Domainr API
+- **Real-time Domain Availability** - Instant checking via Namecheap API
 - **AI Domain Suggestions** - Powered by Groq (gemma2-9b-it)
 - **Analytics Dashboard** - Track searches, suggestions, and user engagement
 - **Domain Quality Evaluation** - AI-powered evaluation system for improving suggestions
@@ -31,7 +31,7 @@ A modern AI-powered domain name search and suggestion platform built with Next.j
 - **Authentication**: Clerk
 - **Payments**: Stripe
 - **AI**: Groq API (domain suggestions), Anthropic Claude (evaluation)
-- **Domain API**: Domainr (availability checking)
+- **Domain API**: Namecheap (availability checking)
 
 ## Getting Started
 
@@ -59,6 +59,13 @@ ANTHROPIC_API_KEY= # Optional: for domain evaluation
 
 # Domain Services
 DOMAINR_API_KEY=
+
+# Namecheap API
+NAMECHEAP_API_KEY=
+NAMECHEAP_API_USER=
+NAMECHEAP_USERNAME=
+NAMECHEAP_CLIENT_IP=
+NAMECHEAP_USE_SANDBOX=true
 
 # Supabase
 NEXT_PUBLIC_SUPABASE_URL=
@@ -179,7 +186,7 @@ Real-time API usage and cost monitoring:
 - **Average cost**: ~$0.0003 per domain search
 - Tracks token usage (input/output) per search
 - Stores LLM model and temperature settings
-- Monitors Domainr API request counts
+- Monitors Namecheap API request counts
 - Detailed cost analytics in dashboard
 
 ### Analytics Dashboard

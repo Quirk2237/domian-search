@@ -6,6 +6,7 @@ import { getClientIp, checkRateLimit } from '@/lib/rate-limit'
 import { getCachedDomainAvailability, setCachedDomainAvailability, throttleRequest } from '@/lib/domain-cache'
 import { getActivePrompt, getActivePromptId } from '@/lib/prompts'
 import { getSessionId, trackDomainSearch, trackDomainSuggestions } from '@/lib/analytics'
+import { checkDomainsNamecheap, isDomainAvailable, getDomainPrice, type NamecheapConfig } from '@/lib/namecheap'
 
 // Simple in-memory cache
 interface CacheEntry {
@@ -20,6 +21,8 @@ interface DomainResult {
   requested?: boolean // Indicates if this was the specific domain requested
   suggested?: boolean // Indicates if this is an AI-suggested variation
   score?: number // Quality score for ranking
+  isPremium?: boolean // Indicates if this is a premium domain
+  price?: number // Price for premium domains (uses same format as EXTENSION_PRICES)
 }
 
 const cache = new Map<string, CacheEntry>()
@@ -197,10 +200,18 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ results: cached.data })
     }
 
-    // Check if API key is configured
-    const apiKey = process.env.DOMAINR_RAPIDAPI_KEY
-    if (!apiKey) {
-      // Return mock data if no API key
+    // Configure Namecheap API
+    const namecheapConfig: NamecheapConfig = {
+      apiKey: process.env.NAMECHEAP_API_KEY || '',
+      apiUser: process.env.NAMECHEAP_API_USER || '',
+      username: process.env.NAMECHEAP_USERNAME || '',
+      clientIp: process.env.NAMECHEAP_CLIENT_IP || '',
+      useSandbox: process.env.NAMECHEAP_USE_SANDBOX === 'true'
+    }
+    
+    // Check if API is configured
+    if (!namecheapConfig.apiKey || !namecheapConfig.apiUser) {
+      // Return mock data if no API configured
       // Determine which extensions to check
       let extensionsToCheck = POPULAR_EXTENSIONS
       
@@ -222,46 +233,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ results: mockResults })
     }
 
-    // Make API calls for each domain
+    // Make API calls for domains
     try {
-
-      // Helper function to check if a status indicates availability
-      const isAvailable = (status: string) => {
-        const statusLower = status?.toLowerCase() || ''
-        
-        // Check for statuses that indicate the domain is NOT available
-        const unavailableStatuses = [
-          'active', 'parked', 'marketed', 'claimed', 'reserved', 'dpml', 'premium',
-          'expiring', 'deleting', 'priced', 'transferable', 'pending',
-          'disallowed', 'invalid', 'suffix', 'zone', 'tld'
-        ]
-        
-        // If status contains any unavailable keyword, it's not available
-        // We need to be careful with substring matching - use word boundaries
-        for (const unavailableStatus of unavailableStatuses) {
-          // Create a regex with word boundaries to avoid false matches
-          // For example, "marketed" should not match in "undelegated"
-          const regex = new RegExp(`\\b${unavailableStatus}\\b`)
-          if (regex.test(statusLower)) {
-            return false
-          }
-        }
-        
-        // Check for available statuses
-        // "inactive" or "undelegated" indicate availability
-        if (statusLower.includes('inactive') || statusLower.includes('undelegated')) {
-          return true
-        }
-        
-        // Special case: "unknown" status means error/misconfiguration, not available
-        if (statusLower.includes('unknown')) {
-          return false
-        }
-        
-        // Log truly unexpected statuses
-        console.log(`Unexpected domain status: "${status}" - marking as not available`)
-        return false
-      }
 
       // Determine which extensions to check
       let extensionsToCheck = POPULAR_EXTENSIONS
@@ -303,68 +276,58 @@ export async function POST(request: NextRequest) {
           })
         : Promise.resolve([])
 
-      // Check exact matches in parallel
-      const exactMatchPromise = Promise.all(extensionsToCheck.map(async ext => {
-        const fullDomain = cleanBaseDomain + ext
+      // Prepare domains to check
+      const domainsToCheck = extensionsToCheck.map(ext => cleanBaseDomain + ext)
+      
+      // Check domains using Namecheap batch API
+      let namecheapResults
+      try {
+        namecheapResults = await checkDomainsNamecheap(domainsToCheck, namecheapConfig)
+      } catch (error) {
+        console.error('Namecheap API error:', error)
+        // On API error, return all domains as unavailable
+        namecheapResults = domainsToCheck.map(domain => ({
+          domain,
+          available: false,
+          errorNo: '0',
+          description: '',
+          isPremiumName: false,
+          premiumRegistrationPrice: 0,
+          premiumRenewalPrice: 0,
+          icannFee: 0,
+          eapFee: 0
+        }))
+      }
+      
+      // Map Namecheap results to our format
+      const exactMatchPromise = Promise.resolve(namecheapResults.map(result => {
+        const extension = result.domain.match(/\.[^.]+$/)?.[0] || ''
+        const isRequested = hasExtension && extension === extension
+        const available = isDomainAvailable(result)
+        const price = getDomainPrice(result)
         
-        // Check cache first
-        const cached = getCachedDomainAvailability(fullDomain)
-        if (cached !== null) {
-          return {
-            domain: fullDomain,
-            available: cached,
-            extension: ext
-          }
+        // Cache the result
+        setCachedDomainAvailability(result.domain, available)
+        
+        const domainResult: DomainResult = {
+          domain: result.domain,
+          available,
+          extension,
+          requested: isRequested
         }
         
-        // Throttle requests
-        await throttleRequest()
-        
-        try {
-          // Make API call for this specific domain
-          const domainResponse = await axios.get(`https://domainr.p.rapidapi.com/v2/status`, {
-            params: {
-              domain: fullDomain
-            },
-            headers: {
-              'X-RapidAPI-Key': apiKey,
-              'X-RapidAPI-Host': 'domainr.p.rapidapi.com'
-            },
-            timeout: 5000
-          })
-          
-          const domainStatus = domainResponse.data.status?.find((s: { domain: string; status: string }) => s.domain === fullDomain)
-          const available = domainStatus ? isAvailable(domainStatus.status) : false
-          
-          // Cache the result
-          setCachedDomainAvailability(fullDomain, available)
-          
-          const result = {
-            domain: fullDomain,
-            available,
-            extension: ext,
-            requested: hasExtension && ext === extension
-          }
-          
-          // Add score if available
-          if (available) {
-            return {
-              ...result,
-              score: scoreDomain(fullDomain, ext, true)
-            }
-          }
-          
-          return result
-        } catch (error) {
-          console.error(`Error checking domain ${fullDomain}:`, error)
-          // On error, mark as unavailable
-          return {
-            domain: fullDomain,
-            available: false,
-            extension: ext,
-            requested: hasExtension && ext === extension
-          }
+        // Add premium info if applicable
+        if (result.isPremiumName) {
+          domainResult.isPremium = true
+          domainResult.price = price
         }
+        
+        // Add score if available
+        if (available) {
+          domainResult.score = scoreDomain(result.domain, extension, true)
+        }
+        
+        return domainResult
       }))
 
       // Wait for both exact matches and AI variations
@@ -374,7 +337,7 @@ export async function POST(request: NextRequest) {
       const aiResults: DomainResult[] = []
       const allTriedVariations: string[] = []
       
-      if (groqApiKey && apiKey) {
+      if (groqApiKey && namecheapConfig.apiKey) {
         let retryCount = 0
         const maxRetries = 3
         const targetResults = 5
@@ -392,64 +355,52 @@ export async function POST(request: NextRequest) {
           // Track these as tried
           allTriedVariations.push(...variations)
           
-          // Check all variations in parallel
-          const aiChecks = await Promise.all(
-            variations.map(async (variation) => {
-            // Try different extensions based on retry count
-            const extensions = retryCount === 0 ? ['.com'] : 
-                             retryCount === 1 ? ['.io', '.co', '.app'] :
-                             ['.net', '.org', '.ai']
+          // Prepare variations with extensions
+          const extensions = retryCount === 0 ? ['.com'] : 
+                           retryCount === 1 ? ['.io', '.co', '.app'] :
+                           ['.net', '.org', '.ai']
+          
+          const variationsWithDomains = variations.map(variation => {
+            const extension = extensions[Math.floor(Math.random() * extensions.length)]
+            return variation + extension
+          })
+          
+          // Check variations using Namecheap batch API
+          let variationResults: Awaited<ReturnType<typeof checkDomainsNamecheap>>
+          try {
+            variationResults = await checkDomainsNamecheap(variationsWithDomains, namecheapConfig)
+          } catch (error) {
+            console.error('Namecheap API error for variations:', error)
+            variationResults = []
+          }
+          
+          // Map results to our format
+          const aiChecks = variationResults.map(result => {
+            const ext = result.domain.match(/(\.[a-z]+)$/)?.[0] || '.com'
+            const available = isDomainAvailable(result)
+            const price = getDomainPrice(result)
             
-            const fullDomain = variation + extensions[Math.floor(Math.random() * extensions.length)]
+            // Cache the result
+            setCachedDomainAvailability(result.domain, available)
             
-            // Check cache first
-            const cached = getCachedDomainAvailability(fullDomain)
-            if (cached !== null) {
-              if (!cached) return null
-              const ext = fullDomain.match(/(\.[a-z]+)$/)?.[0] || '.com'
-              return {
-                domain: fullDomain,
-                available: cached,
-                extension: ext,
-                suggested: true,
-                score: scoreDomain(fullDomain, ext, false)
-              }
+            if (!available) return null
+            
+            const domainResult: DomainResult = {
+              domain: result.domain,
+              available: true,
+              extension: ext,
+              suggested: true,
+              score: scoreDomain(result.domain, ext, false)
             }
             
-            // Throttle requests
-            await throttleRequest()
-            
-            try {
-              const domainResponse = await axios.get(`https://domainr.p.rapidapi.com/v2/status`, {
-                params: { domain: fullDomain },
-                headers: {
-                  'X-RapidAPI-Key': apiKey,
-                  'X-RapidAPI-Host': 'domainr.p.rapidapi.com'
-                },
-                timeout: 5000
-              })
-              
-              const domainStatus = domainResponse.data.status?.find((s: { domain: string; status: string }) => s.domain === fullDomain)
-              const available = domainStatus ? isAvailable(domainStatus.status) : false
-              
-              // Cache the result
-              setCachedDomainAvailability(fullDomain, available)
-              
-              if (!available) return null
-              const ext = fullDomain.match(/(\.[a-z]+)$/)?.[0] || '.com'
-              return {
-                domain: fullDomain,
-                available: true,
-                extension: ext,
-                suggested: true,
-                score: scoreDomain(fullDomain, ext, false)
-              }
-            } catch (error) {
-              console.error(`Error checking variation ${fullDomain}:`, error)
-              return null
+            // Add premium info if applicable
+            if (result.isPremiumName) {
+              domainResult.isPremium = true
+              domainResult.price = price
             }
-            })
-          )
+            
+            return domainResult
+          }).filter(r => r !== null)
           
           // Filter out null results and add to our collection
           const newResults = aiChecks.filter(r => r !== null) as DomainResult[]
@@ -517,22 +468,21 @@ export async function POST(request: NextRequest) {
 
       return NextResponse.json({ results: uniqueResults })
     } catch (apiError) {
-      const error = apiError as AxiosError<{ message: string }>
-      console.error('Domainr API error:', error.response?.status, error.response?.data || error.message)
+      console.error('Namecheap API error:', apiError)
       
-      // Handle specific error cases and return appropriate error messages
-      if (error.response?.status === 403) {
-        console.error('API Key is invalid or forbidden')
-        return NextResponse.json(
-          { error: 'API Key is invalid or you are not subscribed to this API.' },
-          { status: 403 }
-        )
-      } else if (error.response?.status === 429) {
-        console.error('API rate limit exceeded')
-        return NextResponse.json(
-          { error: 'Too many requests. Please try again later.' },
-          { status: 429 }
-        )
+      // Handle specific Namecheap errors
+      if (apiError instanceof Error) {
+        if (apiError.message.includes('Invalid API key')) {
+          return NextResponse.json(
+            { error: 'Invalid Namecheap API key. Please check your configuration.' },
+            { status: 403 }
+          )
+        } else if (apiError.message.includes('Failed to parse')) {
+          return NextResponse.json(
+            { error: 'Invalid response from domain API. Please try again later.' },
+            { status: 500 }
+          )
+        }
       }
       
       // Generic error for other cases

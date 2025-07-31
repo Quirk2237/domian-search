@@ -1,13 +1,13 @@
 'use client'
 
 import { useState, useCallback, useEffect, useRef, Suspense } from 'react'
-import debounce from 'lodash.debounce'
-import { Search, Loader2 } from 'lucide-react'
-import { AutoExpandingInput } from '@/components/ui/auto-expanding-input'
+import { EnhancedSearchInput } from '@/components/ui/enhanced-search-input'
 import { detectSearchMode } from '@/lib/domain-utils'
 import { DomainResults } from './domain-results'
 import { SuggestionResults } from './suggestion-results'
 import { EvaluationScore } from './evaluation-score'
+import { DomainSearchTabs } from './domain-search-tabs'
+import { useAuth } from '@/hooks/use-auth'
 import { cn } from '@/lib/utils'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useSearchParams } from 'next/navigation'
@@ -43,14 +43,14 @@ function DomainSearchInner({ className, onQueryChange, onResultsChange, initialQ
   const [domainResults, setDomainResults] = useState<DomainResult[]>([])
   const [suggestionResults, setSuggestionResults] = useState<SuggestionResult[]>([])
   const [error, setError] = useState<string | null>(null)
-  const [inputHeight, setInputHeight] = useState(56) // Default mobile-friendly height
+  const [inputHeight, setInputHeight] = useState(24)
   const [isSingleLine, setIsSingleLine] = useState(true)
   const [currentSearchId, setCurrentSearchId] = useState<string | null>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const abortControllerRef = useRef<AbortController | null>(null)
-  const lastSearchedQuery = useRef<string>('')
   const searchParams = useSearchParams()
   const isInitialLoad = useRef(true)
+  const { user, loading: authLoading } = useAuth()
 
   // Initialize session ID on mount
   useEffect(() => {
@@ -83,25 +83,16 @@ function DomainSearchInner({ className, onQueryChange, onResultsChange, initialQ
     window.history.replaceState({}, '', newURL)
   }, [searchParams])
 
-  // Create debounced search function
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  const debouncedSearch = useCallback(
-    debounce(async (searchQuery: string, skipURLUpdate = false) => {
+  const handleSearch = useCallback(async (skipURLUpdate = false) => {
       // Get the actual content without just whitespace/newlines
-      const trimmedQuery = searchQuery.trim()
+      const trimmedQuery = query.trim()
       
       if (!trimmedQuery) {
         setDomainResults([])
         setSuggestionResults([])
         setError(null)
         setCurrentSearchId(null)
-        lastSearchedQuery.current = ''
         if (!skipURLUpdate) updateURL('', 'domain')
-        return
-      }
-
-      // Skip if this exact query was just searched
-      if (trimmedQuery === lastSearchedQuery.current) {
         return
       }
 
@@ -122,9 +113,6 @@ function DomainSearchInner({ className, onQueryChange, onResultsChange, initialQ
         abortControllerRef.current.abort()
       }
       abortControllerRef.current = new AbortController()
-
-      // Update last searched query
-      lastSearchedQuery.current = trimmedQuery
 
       setIsLoading(true)
       setError(null)
@@ -190,9 +178,7 @@ function DomainSearchInner({ className, onQueryChange, onResultsChange, initialQ
       } finally {
         setIsLoading(false)
       }
-    }, 800), // Increased from 500ms to reduce API calls during typing
-    [updateURL]
-  )
+  }, [query, updateURL, domainResults.length, suggestionResults.length])
 
   // Handle initial load from URL parameters
   useEffect(() => {
@@ -203,25 +189,12 @@ function DomainSearchInner({ className, onQueryChange, onResultsChange, initialQ
       setSearchMode(mode)
       setIsSingleLine(!initialQuery.includes('\n'))
       // Skip URL update on initial load since we're loading from URL
-      debouncedSearch(initialQuery, true)
+      handleSearch(true)
     } else if (isInitialLoad.current) {
       // No initial query, mark as loaded
       isInitialLoad.current = false
     }
-  }, [initialQuery, debouncedSearch])
-
-  useEffect(() => {
-    // Always trigger search when query changes
-    debouncedSearch(query)
-    
-    // Cleanup function
-    return () => {
-      debouncedSearch.cancel()
-      if (abortControllerRef.current) {
-        abortControllerRef.current.abort()
-      }
-    }
-  }, [query, debouncedSearch])
+  }, [initialQuery, handleSearch])
 
   // Handle height changes for smooth animations
   const handleHeightChange = useCallback((newHeight: number) => {
@@ -238,89 +211,42 @@ function DomainSearchInner({ className, onQueryChange, onResultsChange, initialQ
 
   return (
     <div className={cn('w-full max-w-2xl mx-auto', className)}>
-      <motion.div 
-        className="relative"
-        whileFocus={{ scale: 1.01 }}
-        transition={{ type: "spring", stiffness: 300, damping: 30 }}
-      >
-        <motion.div
-          animate={{ scale: query ? [1, 1.1, 1] : 1 }}
-          transition={{ duration: 0.3 }}
-          className={cn(
-            "absolute left-3 z-10 flex items-center",
-            inputHeight <= 56 ? "top-1/2 -translate-y-1/2" : "top-3"
-          )}
-        >
-          <Search className="text-muted-foreground h-5 w-5" />
-        </motion.div>
-        <motion.div 
-          className={cn(
-            "relative rounded-xl shadow-lg border border-input bg-background",
-            "focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/20",
-            "transition-all duration-200"
-          )}
-          animate={{ 
-            borderColor: query ? "var(--primary)" : "var(--border)",
-            boxShadow: query 
-              ? "0 0 0 2px rgba(var(--primary-rgb), 0.1), 0 10px 15px -3px rgba(0, 0, 0, 0.1)" 
-              : "0 10px 15px -3px rgba(0, 0, 0, 0.1)"
-          }}
-          transition={{ duration: 0.2 }}
-        >
-          <div className={cn(
-            "px-10 transition-all duration-200",
-            inputHeight <= 56 ? "py-3 sm:py-4" : "py-3"
-          )}>
-            <AutoExpandingInput
-              ref={textareaRef}
-              value={query}
-              onChange={(e) => {
-                const newValue = e.target.value
-                setQuery(newValue)
-                // Check if it's single line (no newlines)
-                setIsSingleLine(!newValue.includes('\n'))
-                
-                // Call the onQueryChange callback if provided
-                if (onQueryChange) {
-                  onQueryChange(newValue)
-                }
-              }}
-              onHeightChange={handleHeightChange}
-              className="text-sm sm:text-base lg:text-lg placeholder:text-muted-foreground"
-              placeholder="Search domains or describe your business..."
-              minHeight={20}
-              maxHeight={240}
-              autoFocus
-              autoComplete="off"
-              autoCorrect="off"
-              autoCapitalize="off"
-              spellCheck={false}
-              onKeyDown={(e) => {
-                // Allow Enter to create new lines instead of submitting
-                if (e.key === 'Enter' && !e.shiftKey) {
-                  e.stopPropagation()
-                }
-              }}
-            />
-          </div>
-        </motion.div>
-        <AnimatePresence>
-          {isLoading && (
-            <motion.div
-              className={cn(
-                "absolute right-3 z-10 flex items-center",
-                inputHeight <= 56 ? "top-1/2 -translate-y-1/2" : "top-3"
-              )}
-              initial={{ opacity: 0, scale: 0.8 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.8 }}
-              transition={{ duration: 0.2 }}
-            >
-              <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </motion.div>
+      <EnhancedSearchInput
+        ref={textareaRef}
+        value={query}
+        onChange={(e) => {
+          const newValue = e.target.value
+          setQuery(newValue)
+          // Check if it's single line (no newlines)
+          setIsSingleLine(!newValue.includes('\n'))
+          
+          // Clear results when query changes
+          if (newValue.trim() !== query.trim()) {
+            setDomainResults([])
+            setSuggestionResults([])
+            setCurrentSearchId(null)
+            setError(null)
+          }
+          
+          // Clear URL when input is cleared
+          if (!newValue.trim()) {
+            updateURL('', 'domain')
+          }
+          
+          // Call the onQueryChange callback if provided
+          if (onQueryChange) {
+            onQueryChange(newValue)
+          }
+        }}
+        onHeightChange={handleHeightChange}
+        onSearch={() => handleSearch()}
+        isLoading={isLoading}
+        searchDisabled={!query.trim()}
+        className="text-base placeholder:text-muted-foreground"
+        placeholder=""
+        minHeight={24}
+        maxHeight={500}
+      />
 
       <AnimatePresence>
         {error && (
@@ -343,54 +269,69 @@ function DomainSearchInner({ className, onQueryChange, onResultsChange, initialQ
         )}
       </AnimatePresence>
 
-      <AnimatePresence mode="wait">
-        {!error && query.trim() && !isLoading && (
-          <motion.div 
-            className="mt-6"
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: "auto" }}
-            exit={{ opacity: 0, height: 0 }}
-            transition={{ duration: 0.3 }}
-          >
-            <AnimatePresence mode="wait">
-              {searchMode === 'domain' && domainResults.length > 0 && (
-                <motion.div
-                  key="domain-results"
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -20 }}
-                  transition={{ duration: 0.3 }}
-                >
-                  <DomainResults results={domainResults} searchQuery={query.trim()} />
-                </motion.div>
-              )}
-              {searchMode === 'suggestion' && suggestionResults.length > 0 && (
-                <motion.div
-                  key="suggestion-results"
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -20 }}
-                  transition={{ duration: 0.3 }}
-                  className="space-y-4"
-                >
-                  <SuggestionResults results={suggestionResults} searchQuery={query.trim()} />
-                  <EvaluationScore searchId={currentSearchId} className="mt-6 pt-6 border-t" />
-                </motion.div>
-              )}
-              {searchMode === 'suggestion' && suggestionResults.length === 0 && (
-                <motion.div 
-                  className="text-center py-8 text-muted-foreground"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                >
-                  No available domains found. Try a different search term.
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {/* Show tabbed interface for authenticated users */}
+      {user && !authLoading && (
+        <DomainSearchTabs
+          searchMode={searchMode}
+          domainResults={domainResults}
+          suggestionResults={suggestionResults}
+          searchQuery={query.trim()}
+          currentSearchId={currentSearchId}
+          isVisible={!error && query.trim() !== '' && !isLoading}
+        />
+      )}
+
+      {/* Show simple results for unauthenticated users */}
+      {(!user && !authLoading) && (
+        <AnimatePresence mode="wait">
+          {!error && query.trim() && !isLoading && (domainResults.length > 0 || suggestionResults.length > 0) && (
+            <motion.div 
+              className="mt-6"
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: "auto" }}
+              exit={{ opacity: 0, height: 0 }}
+              transition={{ duration: 0.3 }}
+            >
+              <AnimatePresence mode="wait">
+                {searchMode === 'domain' && domainResults.length > 0 && (
+                  <motion.div
+                    key="domain-results"
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -20 }}
+                    transition={{ duration: 0.3 }}
+                  >
+                    <DomainResults results={domainResults} searchQuery={query.trim()} />
+                  </motion.div>
+                )}
+                {searchMode === 'suggestion' && suggestionResults.length > 0 && (
+                  <motion.div
+                    key="suggestion-results"
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -20 }}
+                    transition={{ duration: 0.3 }}
+                    className="space-y-4"
+                  >
+                    <SuggestionResults results={suggestionResults} searchQuery={query.trim()} />
+                    <EvaluationScore searchId={currentSearchId} className="mt-6 pt-6 border-t" />
+                  </motion.div>
+                )}
+                {searchMode === 'suggestion' && suggestionResults.length === 0 && (
+                  <motion.div 
+                    className="text-center py-8 text-muted-foreground"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                  >
+                    No available domains found. Try a different search term.
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      )}
     </div>
   )
 }

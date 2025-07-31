@@ -1,3 +1,5 @@
+import { createBrowserClient } from '@supabase/ssr'
+
 /**
  * Get the Supabase project URL from environment variables
  */
@@ -18,4 +20,14 @@ export function getAnonKey(): string {
     throw new Error('NEXT_PUBLIC_SUPABASE_ANON_KEY not configured')
   }
   return key
+}
+
+/**
+ * Create a Supabase client for use in client components
+ */
+export function createClient() {
+  return createBrowserClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  )
 }

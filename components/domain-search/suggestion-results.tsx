@@ -3,14 +3,20 @@
 import { Check, ExternalLink, Share2 } from 'lucide-react'
 import { EXTENSION_PRICES } from '@/lib/domain-utils'
 import { motion, useReducedMotion } from 'framer-motion'
-import { useCallback } from 'react'
+import { useCallback, useState } from 'react'
 import { toast } from 'sonner'
+import { useBookmarks } from '@/hooks/use-bookmarks'
+import { useAuth } from '@/hooks/use-auth'
+import { AuthDialog } from '@/components/auth/auth-dialog'
+import { AnimatedBookmarkButton } from '@/components/ui/animated-bookmark-button'
 
 interface SuggestionResult {
   domain: string
   available: boolean
   extension: string
   reason?: string
+  isPremium?: boolean
+  price?: number
 }
 
 interface SuggestionResultsProps {
@@ -35,6 +41,9 @@ const item = {
 
 export function SuggestionResults({ results, searchQuery }: SuggestionResultsProps) {
   const shouldReduceMotion = useReducedMotion()
+  const { user } = useAuth()
+  const { isBookmarked, toggleBookmark } = useBookmarks()
+  const [authDialogOpen, setAuthDialogOpen] = useState(false)
   
   const handleDomainClick = useCallback(async (domain: string) => {
     try {
@@ -66,6 +75,18 @@ export function SuggestionResults({ results, searchQuery }: SuggestionResultsPro
       console.error('Error copying to clipboard:', error)
     }
   }, [])
+  
+  const handleBookmark = useCallback(async (result: SuggestionResult) => {
+    const domainParts = result.domain.split('.')
+    const domainName = domainParts.slice(0, -1).join('.')
+    const extension = result.extension || domainParts[domainParts.length - 1]
+    
+    const response = await toggleBookmark(domainName, extension)
+    
+    if (response?.requiresAuth) {
+      setAuthDialogOpen(true)
+    }
+  }, [toggleBookmark])
 
   return (
     <motion.div 
@@ -115,7 +136,14 @@ export function SuggestionResults({ results, searchQuery }: SuggestionResultsPro
               >
                 <Check className="h-5 w-5 text-green-500" />
               </motion.div>
-              <span className="text-lg font-medium text-foreground truncate">{result.domain}</span>
+              <div className="flex items-center gap-2">
+                <span className="text-lg font-medium text-foreground truncate">{result.domain}</span>
+                {result.isPremium && (
+                  <span className="px-2 py-1 text-xs font-medium bg-amber-100 text-amber-800 rounded-full border border-amber-200">
+                    Premium
+                  </span>
+                )}
+              </div>
             </div>
             {result.reason && (
               <motion.p 
@@ -129,25 +157,37 @@ export function SuggestionResults({ results, searchQuery }: SuggestionResultsPro
             )}
           </div>
           
-          <div className="flex items-center justify-between sm:justify-end gap-4 sm:ml-4 pl-8 sm:pl-0">
+          <div className="flex items-center justify-between sm:justify-end gap-3 sm:ml-4 pl-8 sm:pl-0">
             <span className="text-lg font-semibold text-foreground whitespace-nowrap">
-              ${EXTENSION_PRICES[result.extension] || 29.99}/year
+              ${result.price || EXTENSION_PRICES[result.extension] || 29.99}/year
             </span>
-            <motion.a
-              href={`https://www.namecheap.com/domains/registration/results/?domain=${result.domain}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="p-3 sm:p-2.5 text-blue-600 hover:bg-blue-50 active:bg-blue-100 rounded-lg transition-colors touch-manipulation"
-              aria-label={`Register ${result.domain}`}
-              onClick={() => handleDomainClick(result.domain)}
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-            >
-              <ExternalLink className="h-5 w-5" />
-            </motion.a>
+            <div className="flex items-center gap-2">
+              <AnimatedBookmarkButton
+                isBookmarked={isBookmarked(
+                  result.domain.split('.').slice(0, -1).join('.'),
+                  result.extension || result.domain.split('.').pop() || ''
+                )}
+                onToggle={() => handleBookmark(result)}
+                aria-label={`Bookmark ${result.domain}`}
+              />
+              <motion.a
+                href={`https://www.namecheap.com/domains/registration/results/?domain=${result.domain}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="p-3 sm:p-2.5 text-blue-600 hover:bg-blue-50 active:bg-blue-100 rounded-lg transition-colors touch-manipulation"
+                aria-label={`Register ${result.domain}`}
+                onClick={() => handleDomainClick(result.domain)}
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+              >
+                <ExternalLink className="h-5 w-5" />
+              </motion.a>
+            </div>
           </div>
         </motion.div>
       ))}
+      
+      <AuthDialog open={authDialogOpen} onOpenChange={setAuthDialogOpen} />
     </motion.div>
   )
 }

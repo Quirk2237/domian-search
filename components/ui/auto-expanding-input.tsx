@@ -1,7 +1,6 @@
 'use client'
 
 import * as React from 'react'
-import { motion } from 'framer-motion'
 import { cn } from '@/lib/utils'
 
 interface AutoExpandingInputProps extends Omit<React.ComponentProps<'textarea'>, 'rows'> {
@@ -12,82 +11,153 @@ interface AutoExpandingInputProps extends Omit<React.ComponentProps<'textarea'>,
 }
 
 const AutoExpandingInput = React.forwardRef<HTMLTextAreaElement, AutoExpandingInputProps>(
-  ({ className, minHeight = 40, maxHeight = 300, onHeightChange, ...props }, ref) => {
-    const [height, setHeight] = React.useState(minHeight)
+  ({ className, minHeight = 24, maxHeight = 500, onHeightChange, value, onChange, onKeyDown, ...props }, ref) => {
     const textareaRef = React.useRef<HTMLTextAreaElement>(null)
-    const combinedRef = React.useMemo(() => {
-      return (node: HTMLTextAreaElement) => {
-        textareaRef.current = node
-        if (typeof ref === 'function') {
-          ref(node)
-        } else if (ref) {
-          ref.current = node
+    const [height, setHeight] = React.useState(minHeight)
+    
+    // Combine refs
+    React.useImperativeHandle(ref, () => textareaRef.current as HTMLTextAreaElement)
+    
+    // Scroll to cursor position to ensure it's visible
+    const scrollToCursor = React.useCallback(() => {
+      const textarea = textareaRef.current
+      if (!textarea) return
+      
+      // Get cursor position
+      const cursorPos = textarea.selectionStart
+      const textBeforeCursor = textarea.value.substring(0, cursorPos)
+      
+      // Create a temporary element to measure text width
+      const canvas = document.createElement('canvas')
+      const context = canvas.getContext('2d')
+      if (context) {
+        const computedStyle = window.getComputedStyle(textarea)
+        context.font = `${computedStyle.fontSize} ${computedStyle.fontFamily}`
+        
+        // Measure width of text before cursor
+        const textWidth = context.measureText(textBeforeCursor).width
+        const containerWidth = textarea.clientWidth
+        
+        // If text extends beyond visible area, scroll to show cursor
+        if (textWidth > textarea.scrollLeft + containerWidth - 20) {
+          textarea.scrollLeft = textWidth - containerWidth + 40
+        } else if (textWidth < textarea.scrollLeft + 20) {
+          textarea.scrollLeft = Math.max(0, textWidth - 20)
         }
       }
-    }, [ref])
+    }, [])
 
+    // Auto-resize logic
     const adjustHeight = React.useCallback(() => {
       const textarea = textareaRef.current
       if (!textarea) return
-
-      // Reset height to allow shrinking
-      textarea.style.height = `${minHeight}px`
       
-      // Calculate the required height
+      // Store current scroll positions
+      const scrollPosY = textarea.scrollTop
+      const scrollPosX = textarea.scrollLeft
+      
+      // Reset height to measure actual content
+      textarea.style.height = 'auto'
+      
+      // Calculate new height
       const scrollHeight = textarea.scrollHeight
       const newHeight = Math.min(Math.max(scrollHeight, minHeight), maxHeight)
       
-      // Only update if height actually changed to avoid unnecessary re-renders
+      // Apply new height
+      textarea.style.height = `${newHeight}px`
+      
+      // If content exceeds maxHeight, enable vertical scrolling
+      if (scrollHeight > maxHeight) {
+        textarea.style.overflowY = 'auto'
+      } else {
+        textarea.style.overflowY = 'hidden'
+      }
+      
+      // Restore scroll positions
+      textarea.scrollTop = scrollPosY
+      textarea.scrollLeft = scrollPosX
+      
+      // Update state and notify parent
       if (newHeight !== height) {
         setHeight(newHeight)
         onHeightChange?.(newHeight)
       }
-    }, [height, minHeight, maxHeight, onHeightChange])
-
-    // Adjust height when value changes
-    React.useEffect(() => {
+      
+      // Ensure cursor is visible after height adjustment
+      scrollToCursor()
+    }, [height, minHeight, maxHeight, onHeightChange, scrollToCursor])
+    
+    // Adjust height on mount and when value changes
+    React.useLayoutEffect(() => {
       adjustHeight()
-    }, [props.value, adjustHeight])
-
+    }, [value, adjustHeight])
+    
     // Handle input changes
-    const handleInput = React.useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
-      props.onChange?.(e)
-      // Slight delay to ensure DOM is updated before measuring
-      requestAnimationFrame(adjustHeight)
-    }, [props, adjustHeight])
+    const handleChange = React.useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
+      onChange?.(e)
+      // Use RAF to ensure DOM updates before measuring and scrolling
+      requestAnimationFrame(() => {
+        adjustHeight()
+        // Small delay to ensure text is rendered before scrolling
+        setTimeout(scrollToCursor, 0)
+      })
+    }, [onChange, adjustHeight, scrollToCursor])
 
+    // Handle key events for cursor position changes
+    const handleKeyDown = React.useCallback((e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+      // For navigation keys, ensure cursor remains visible
+      if (['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(e.key)) {
+        setTimeout(scrollToCursor, 0)
+      }
+      onKeyDown?.(e)
+    }, [scrollToCursor, onKeyDown])
+
+    // Handle selection changes (mouse clicks, etc.)
+    const handleSelect = React.useCallback(() => {
+      setTimeout(scrollToCursor, 0)
+    }, [scrollToCursor])
+    
     return (
-      <motion.div
-        animate={{ height }}
-        transition={{
-          type: "spring",
-          stiffness: 300,
-          damping: 30,
-          duration: 0.2
+      <textarea
+        ref={textareaRef}
+        value={value}
+        onChange={handleChange}
+        onKeyDown={handleKeyDown}
+        onSelect={handleSelect}
+        {...props}
+        className={cn(
+          // Base styles matching Chat CN textarea
+          "flex w-full border-0 bg-transparent outline-none",
+          // Typography - consistent with Chat CN patterns
+          "text-base md:text-sm placeholder:text-muted-foreground",
+          // Remove default padding/margin
+          "p-0 m-0",
+          // Disable resize handle and enable scrolling
+          "resize-none overflow-y-auto overflow-x-auto",
+          // Smooth scrolling behavior
+          "scroll-smooth",
+          // Smooth height transitions
+          "transition-[height] duration-200 ease-out",
+          // Selection styling matching Chat CN
+          "selection:bg-primary selection:text-primary-foreground",
+          // Custom scrollbar styling for better UX
+          "scrollbar-thin scrollbar-track-transparent scrollbar-thumb-border/30 hover:scrollbar-thumb-border/50",
+          // Vertical scrollbar styling
+          "[&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-full",
+          // Ensure proper text rendering and cursor visibility
+          "text-left field-sizing-content",
+          className
+        )}
+        style={{
+          height: `${height}px`,
+          minHeight: `${minHeight}px`,
+          maxHeight: `${maxHeight}px`,
+          // Ensure consistent line height
+          lineHeight: '1.5',
+          ...props.style
         }}
-        style={{ overflow: 'hidden' }}
-      >
-        <textarea
-          ref={combinedRef}
-          {...props}
-          onChange={handleInput}
-          className={cn(
-            // Base styles
-            "w-full resize-none overflow-hidden border-0 bg-transparent p-0 outline-none",
-            // Typography
-            "text-sm sm:text-base lg:text-lg",
-            // Remove default textarea styles
-            "field-sizing-content",
-            className
-          )}
-          style={{
-            height: `${height}px`,
-            minHeight: `${minHeight}px`,
-            maxHeight: `${maxHeight}px`,
-          }}
-          rows={1}
-        />
-      </motion.div>
+        rows={1}
+      />
     )
   }
 )

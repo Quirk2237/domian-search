@@ -13,6 +13,7 @@ import {
   logApiUsage,
   updateSearchCosts
 } from '@/lib/cost-tracking'
+import { checkDomainsNamecheap, isDomainAvailable, getDomainPrice, type NamecheapConfig } from '@/lib/namecheap'
 
 // Simple in-memory cache
 interface SuggestionResult {
@@ -20,6 +21,8 @@ interface SuggestionResult {
   available: boolean
   extension: string
   reason?: string
+  isPremium?: boolean
+  price?: number
 }
 
 interface CacheEntry {
@@ -181,132 +184,93 @@ IMPORTANT: Output ONLY the JSON array. Start with [ and end with ].`
   }
 }
 
-async function checkDomainAvailability(domain: string, apiKey?: string): Promise<boolean> {
-  // Check cache first
-  const cached = getCachedDomainAvailability(domain)
-  if (cached !== null) {
-    console.log(`Cache hit for ${domain}: ${cached}`)
-    return cached
+async function checkDomainAvailabilityBatch(domains: string[], namecheapConfig: NamecheapConfig): Promise<{ domain: string; available: boolean; isPremium?: boolean; price?: number }[]> {
+  // Check cache first for all domains
+  const results: { domain: string; available: boolean; isPremium?: boolean; price?: number }[] = []
+  const domainsToCheck: string[] = []
+  
+  for (const domain of domains) {
+    const cached = getCachedDomainAvailability(domain)
+    if (cached !== null) {
+      console.log(`Cache hit for ${domain}: ${cached}`)
+      results.push({ domain, available: cached })
+    } else {
+      domainsToCheck.push(domain)
+    }
   }
   
-  console.log(`Checking availability for: ${domain}, API key exists: ${!!apiKey}`)
+  if (domainsToCheck.length === 0) {
+    return results
+  }
+  
+  console.log(`Checking availability for ${domainsToCheck.length} domains`)
   
   // Check if API is temporarily disabled due to failures
   if (apiDisabledUntil > Date.now()) {
-    console.log('API temporarily disabled due to failures, using mock data')
-    apiKey = undefined
+    console.log('API temporarily disabled due to failures, returning false for all')
+    for (const domain of domainsToCheck) {
+      results.push({ domain, available: false })
+    }
+    return results
   }
   
-  if (!apiKey) {
-    // Without API key, we can't verify availability
-    // Return false to be safe and avoid showing taken domains as available
-    console.log(`No Domainr API key for ${domain}: cannot verify availability`)
-    return false
+  if (!namecheapConfig.apiKey || !namecheapConfig.apiUser) {
+    console.log('No Namecheap API configured - returning false for all domains')
+    for (const domain of domainsToCheck) {
+      results.push({ domain, available: false })
+    }
+    return results
   }
-  
-  // Throttle API requests
-  await throttleRequest()
 
   try {
-    const response = await axios.get(`https://domainr.p.rapidapi.com/v2/status`, {
-      params: { domain },
-      headers: {
-        'X-RapidAPI-Key': apiKey,
-        'X-RapidAPI-Host': 'domainr.p.rapidapi.com'
-      },
-      timeout: 5000 // 5 second timeout
-    })
-    
-    console.log(`API response for ${domain}:`, JSON.stringify(response.data, null, 2))
-    
-    // Check if we have status data
-    if (!response.data.status || !Array.isArray(response.data.status)) {
-      console.log(`No status array in response for ${domain}`)
-      return false
-    }
-    
-    // Check all status entries (domain might be split into parts)
-    const statuses = response.data.status
-    let isAvailable = false
-    
-    // Helper function to check if a status indicates availability
-    const isStatusAvailable = (status: string) => {
-      const statusLower = status?.toLowerCase() || ''
-      
-      // Check for statuses that indicate the domain is NOT available
-      const unavailableStatuses = [
-        'active', 'parked', 'marketed', 'claimed', 'reserved', 'dpml', 'premium',
-        'expiring', 'deleting', 'priced', 'transferable', 'pending',
-        'disallowed', 'invalid', 'suffix', 'zone', 'tld'
-      ]
-      
-      // If status contains any unavailable keyword, it's not available
-      // We need to be careful with substring matching - use word boundaries
-      for (const unavailableStatus of unavailableStatuses) {
-        // Create a regex with word boundaries to avoid false matches
-        // For example, "marketed" should not match in "undelegated"
-        const regex = new RegExp(`\\b${unavailableStatus}\\b`)
-        if (regex.test(statusLower)) {
-          return false
-        }
-      }
-      
-      // Check for available statuses
-      // "inactive" or "undelegated" indicate availability
-      if (statusLower.includes('inactive') || statusLower.includes('undelegated')) {
-        return true
-      }
-      
-      // Special case: "unknown" status means error/misconfiguration, not available
-      if (statusLower.includes('unknown')) {
-        return false
-      }
-      
-      // Log truly unexpected statuses
-      console.log(`Unexpected domain status: "${status}" - marking as not available`)
-      return false
-    }
-    
-    // A domain is available if ALL parts are available
-    const allPartsAvailable = statuses.every((s: { domain: string; status: string }) => isStatusAvailable(s.status))
-    
-    // Also check if the exact domain has an available status
-    const exactDomainStatus = statuses.find((s: { domain: string; status: string }) => s.domain === domain)
-    if (exactDomainStatus) {
-      isAvailable = isStatusAvailable(exactDomainStatus.status)
-    } else {
-      isAvailable = allPartsAvailable
-    }
-    
-    console.log(`API result for ${domain}: ${statuses.map((s: { domain: string; status: string }) => `${s.domain}:${s.status}`).join(', ')} -> ${isAvailable}`)
+    const namecheapResults = await checkDomainsNamecheap(domainsToCheck, namecheapConfig)
     
     // Reset failure count on success
     apiFailureCount = 0
     
-    // Cache the result
-    setCachedDomainAvailability(domain, isAvailable)
+    for (const result of namecheapResults) {
+      const available = isDomainAvailable(result)
+      const price = getDomainPrice(result)
+      
+      // Cache the result
+      setCachedDomainAvailability(result.domain, available)
+      
+      results.push({
+        domain: result.domain,
+        available,
+        isPremium: result.isPremiumName,
+        price
+      })
+    }
     
-    return isAvailable
+    return results
   } catch (error) {
-    const axiosError = error as AxiosError<{ message: string; error?: { message?: string } }>
-    console.error('Domainr API error:', axiosError.response?.status, axiosError.response?.data || axiosError.message)
+    console.error('Namecheap API error:', error)
     
-    // Check for 401 unauthorized specifically
-    if (axiosError.response?.status === 401) {
-      console.error('Domainr API key is invalid')
-      // Don't increment failure count for auth errors
-      throw new Error('Invalid Domainr API key')
+    // Don't disable API for authentication/configuration errors
+    const errorMessage = error instanceof Error ? error.message : String(error)
+    const isConfigError = errorMessage.includes('API Error') || 
+                         errorMessage.includes('Invalid') ||
+                         errorMessage.includes('authentication') ||
+                         errorMessage.includes('API key')
+    
+    if (!isConfigError) {
+      // Only increment failure count for temporary/network errors
+      apiFailureCount++
+      if (apiFailureCount >= MAX_API_FAILURES) {
+        apiDisabledUntil = Date.now() + 5 * 60 * 1000 // Disable for 5 minutes
+        console.log('API disabled for 5 minutes due to repeated failures')
+      }
+    } else {
+      console.error('Configuration error detected, not disabling API:', errorMessage)
     }
     
-    // Increment failure count and disable API if too many failures
-    apiFailureCount++
-    if (apiFailureCount >= MAX_API_FAILURES) {
-      apiDisabledUntil = Date.now() + 5 * 60 * 1000 // Disable for 5 minutes
-      console.log('API disabled for 5 minutes due to repeated failures')
+    // Return all domains as unavailable on error
+    for (const domain of domainsToCheck) {
+      results.push({ domain, available: false })
     }
     
-    // Throw the error to be handled by the caller
-    throw axiosError
+    return results
   }
 }
 
@@ -368,7 +332,15 @@ export async function POST(request: NextRequest) {
     }
 
     const groqApiKey = process.env.GROQ_API_KEY
-    const domainrApiKey = process.env.DOMAINR_RAPIDAPI_KEY
+    
+    // Configure Namecheap API
+    const namecheapConfig: NamecheapConfig = {
+      apiKey: process.env.NAMECHEAP_API_KEY || '',
+      apiUser: process.env.NAMECHEAP_API_USER || '',
+      username: process.env.NAMECHEAP_USERNAME || '',
+      clientIp: process.env.NAMECHEAP_CLIENT_IP || '',
+      useSandbox: process.env.NAMECHEAP_USE_SANDBOX === 'true'
+    }
 
     if (!groqApiKey) {
       // Return empty suggestions if no API key to avoid misleading results
@@ -448,7 +420,7 @@ IMPORTANT: Output ONLY the JSON array. Start with [ and end with ].`
     let totalInputTokens = 0
     let totalOutputTokens = 0
     let totalGroqCost = 0
-    let domainrRequestCount = 0
+    let namecheapRequestCount = 0
 
     // Generate domain suggestions using AI
     let completion
@@ -586,83 +558,91 @@ IMPORTANT: Output ONLY the JSON array. Start with [ and end with ].`
         
         console.log(`${retryCount === 0 ? 'Checking' : `Retry ${retryCount}:`} ${currentBatch.length} domains in parallel...`)
         
-        // Process domains in parallel for better performance
-        const suggestionsWithAvailability = await Promise.all(
-          currentBatch.map(async (suggestion: { domain: string; extension?: string; reason?: string }) => {
-            // Smart extension rotation based on retry count
-            let fullDomain = suggestion.domain
+        // Prepare domains with extensions for batch checking
+        const domainsToCheck = currentBatch.map((suggestion: { domain: string; extension?: string; reason?: string }) => {
+          let fullDomain = suggestion.domain
+          
+          // If no extension provided or we're on a retry, assign based on retry count
+          if (!fullDomain.includes('.')) {
+            const extensions = retryCount === 0 ? ['.com'] :
+                             retryCount === 1 ? ['.io', '.co', '.app'] :
+                             ['.net', '.org', '.ai']
             
-            // If no extension provided or we're on a retry, assign based on retry count
-            if (!fullDomain.includes('.')) {
-              const extensions = retryCount === 0 ? ['.com'] :
-                               retryCount === 1 ? ['.io', '.co', '.app'] :
-                               ['.net', '.org', '.ai']
-              
-              // Use suggested extension if valid for this retry, otherwise pick randomly
-              const suggestedExt = suggestion.extension || '.com'
-              const useExtension = extensions.includes(suggestedExt) ? 
-                suggestedExt : 
-                extensions[Math.floor(Math.random() * extensions.length)]
-              
-              fullDomain = fullDomain + useExtension
-            } else if (suggestion.extension && !fullDomain.includes('.')) {
-              // Handle case where extension is provided separately
-              const extensionWithoutDot = suggestion.extension.substring(1)
-              if (fullDomain.endsWith(extensionWithoutDot)) {
-                fullDomain = fullDomain.slice(0, -extensionWithoutDot.length) + suggestion.extension
-              } else {
-                fullDomain = fullDomain + suggestion.extension
-              }
+            // Use suggested extension if valid for this retry, otherwise pick randomly
+            const suggestedExt = suggestion.extension || '.com'
+            const useExtension = extensions.includes(suggestedExt) ? 
+              suggestedExt : 
+              extensions[Math.floor(Math.random() * extensions.length)]
+            
+            fullDomain = fullDomain + useExtension
+          } else if (suggestion.extension && !fullDomain.includes('.')) {
+            // Handle case where extension is provided separately
+            const extensionWithoutDot = suggestion.extension.substring(1)
+            if (fullDomain.endsWith(extensionWithoutDot)) {
+              fullDomain = fullDomain.slice(0, -extensionWithoutDot.length) + suggestion.extension
+            } else {
+              fullDomain = fullDomain + suggestion.extension
             }
-            
-            const cleanDomain = formatDomainName(fullDomain)
-            
-            try {
-              const available = await checkDomainAvailability(cleanDomain, domainrApiKey)
-              domainrRequestCount++ // Track Domainr API calls
-              
-              if (available) {
-                console.log(`✓ Domain ${cleanDomain} is AVAILABLE`)
-                return {
-                  domain: cleanDomain,
-                  available,
-                  extension: suggestion.extension || '.com',
-                  reason: suggestion.reason,
-                  status: 'available' as const
-                }
-              } else {
-                console.log(`✗ Domain ${cleanDomain} is TAKEN`)
-                // Track unavailable domains
-                unavailableDomains.push({
-                  domain: cleanDomain,
-                  extension: suggestion.extension || '.com',
-                  reason: suggestion.reason
-                })
-                return {
-                  domain: cleanDomain,
-                  available: false,
-                  extension: suggestion.extension || '.com',
-                  reason: suggestion.reason,
-                  status: 'unavailable' as const
-                }
-              }
-            } catch (error) {
-              // If domain check fails, return null
-              const err = error as Error
-              console.log(`✗ Domain ${cleanDomain} check failed:`, err.message)
-              
-              // If it's an API key error, throw it to stop processing
-              if (err.message === 'Invalid Domainr API key') {
-                throw err
-              }
-              return null
-            }
-          })
+          }
+          
+          return {
+            ...suggestion,
+            fullDomain: formatDomainName(fullDomain)
+          }
+        })
+        
+        // Check all domains in batch using Namecheap
+        const batchResults = await checkDomainAvailabilityBatch(
+          domainsToCheck.map((d: { fullDomain: string }) => d.fullDomain), 
+          namecheapConfig
         )
+        namecheapRequestCount += batchResults.length // Track API calls
+        
+        // Map batch results back to suggestions
+        const suggestionsWithAvailability = domainsToCheck.map((domainData: { fullDomain: string; reason?: string; domain: string; extension?: string }) => {
+          const batchResult = batchResults.find(r => r.domain === domainData.fullDomain)
+          if (!batchResult) return null
+          
+          const extension = domainData.fullDomain.match(/(\.[^.]+)$/)?.[0] || '.com'
+          
+          if (batchResult.available) {
+            console.log(`✓ Domain ${domainData.fullDomain} is AVAILABLE`)
+            const result: SuggestionResult & { status: 'available' } = {
+              domain: domainData.fullDomain,
+              available: true,
+              extension,
+              reason: domainData.reason,
+              status: 'available' as const
+            }
+            
+            // Add premium info if applicable
+            if (batchResult.isPremium) {
+              result.isPremium = true
+              result.price = batchResult.price
+            }
+            
+            return result
+          } else {
+            console.log(`✗ Domain ${domainData.fullDomain} is TAKEN`)
+            // Track unavailable domains
+            unavailableDomains.push({
+              domain: domainData.fullDomain,
+              extension,
+              reason: domainData.reason
+            })
+            return {
+              domain: domainData.fullDomain,
+              available: false,
+              extension,
+              reason: domainData.reason,
+              status: 'unavailable' as const
+            }
+          }
+        }).filter((r: unknown) => r !== null)
         
         // Separate available and unavailable results
-        const results = suggestionsWithAvailability.filter(r => r !== null) as Array<SuggestionResult & { status: 'available' | 'unavailable' }>
-        const newAvailableResults = results.filter(r => r.status === 'available')
+        const results = suggestionsWithAvailability.filter((r: unknown) => r !== null) as Array<SuggestionResult & { status: 'available' | 'unavailable' }>
+        const newAvailableResults = results.filter((r: SuggestionResult & { status: 'available' | 'unavailable' }) => r.status === 'available')
         availableDomains.push(...newAvailableResults)
         
         // Add all checked domains to our tracking list
@@ -709,7 +689,7 @@ IMPORTANT: Output ONLY the JSON array. Start with [ and end with ].`
           inputTokens: totalInputTokens,
           outputTokens: totalOutputTokens,
           groqCost: totalGroqCost,
-          domainrRequests: domainrRequestCount,
+          domainrRequests: namecheapRequestCount,
           totalCost: totalGroqCost // For now, only Groq costs (Domainr is free tier)
         })
         
@@ -798,9 +778,9 @@ IMPORTANT: Output ONLY the JSON array. Start with [ and end with ].`
           { error: 'Domain availability service is currently unavailable. Please try again later.' },
           { status: 503 }
         )
-      } else if (error.message === 'Invalid Domainr API key') {
+      } else if (error.message.includes('Invalid') && error.message.includes('API')) {
         return NextResponse.json(
-          { error: 'Invalid domain checking API key. Please check your Domainr API configuration.' },
+          { error: 'Invalid domain checking API key. Please check your Namecheap API configuration.' },
           { status: 500 }
         )
       }
