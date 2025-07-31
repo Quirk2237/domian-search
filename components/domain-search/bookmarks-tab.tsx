@@ -8,19 +8,19 @@ import { toast } from 'sonner'
 import { useBookmarks } from '@/hooks/use-bookmarks'
 import { useAuth } from '@/hooks/use-auth'
 import { AuthDialog } from '@/components/auth/auth-dialog'
-import { AnimatedBookmarkButton } from '@/components/ui/animated-bookmark-button'
 
 interface BookmarkedDomain {
   id: string
   domain: string
   extension: string
+  fullDomain: string
   available?: boolean
   bookmarkedAt: Date
   isPremium?: boolean
-  price?: number
+  price: number
 }
 
-interface BookmarksDisplayProps {
+interface BookmarksTabProps {
   className?: string
 }
 
@@ -46,38 +46,38 @@ const emptyStateVariants = {
     scale: 1,
     transition: { 
       duration: 0.3, 
-      ease: "easeOut" as const 
+      ease: "easeOut" as const
     }
   }
 }
 
-export function BookmarksDisplay({ className }: BookmarksDisplayProps) {
+export function BookmarksTab({ className }: BookmarksTabProps) {
   const shouldReduceMotion = useReducedMotion()
   const { user } = useAuth()
   const { bookmarks, loading, toggleBookmark } = useBookmarks()
   const [authDialogOpen, setAuthDialogOpen] = useState(false)
   const [checkingAvailability, setCheckingAvailability] = useState<Set<string>>(new Set())
-
-  // Debug logging
-  console.log('BookmarksDisplay - user:', user)
-  console.log('BookmarksDisplay - loading:', loading)
-  console.log('BookmarksDisplay - bookmarks:', bookmarks)
-
-  // Convert bookmarks to display format
-  const bookmarkedDomains: BookmarkedDomain[] = bookmarks.map(bookmark => ({
-    id: bookmark.id,
-    domain: `${bookmark.domain}${bookmark.extension}`,
-    extension: bookmark.extension.startsWith('.') ? bookmark.extension.slice(1) : bookmark.extension,
-    bookmarkedAt: new Date(bookmark.created_at),
-    // We'll add availability checking later
-    available: undefined,
-    isPremium: false,
-    price: EXTENSION_PRICES[bookmark.extension.startsWith('.') ? bookmark.extension.slice(1) : bookmark.extension] || 29.99
-  }))
+  
+  // Convert raw bookmarks to display format
+  const bookmarkedDomains: BookmarkedDomain[] = bookmarks.map(bookmark => {
+    // Handle extension - ensure it starts with dot for storage but clean for display
+    const extension = bookmark.extension.startsWith('.') ? bookmark.extension.slice(1) : bookmark.extension
+    const fullDomain = `${bookmark.domain}.${extension}`
+    
+    return {
+      id: bookmark.id,
+      domain: bookmark.domain,
+      extension: extension,
+      fullDomain: fullDomain,
+      bookmarkedAt: new Date(bookmark.created_at),
+      available: undefined, // Will be set when checking availability
+      isPremium: false, // Could be enhanced later
+      price: EXTENSION_PRICES[extension] || 29.99
+    }
+  })
 
   const trackClick = useCallback(async (domain: string) => {
     try {
-      // Get session ID from localStorage
       const sessionId = localStorage.getItem('domain_search_session')
       if (!sessionId) return
 
@@ -97,24 +97,20 @@ export function BookmarksDisplay({ className }: BookmarksDisplayProps) {
   }, [])
 
   const handleRemoveBookmark = useCallback(async (bookmark: BookmarkedDomain) => {
-    const domainParts = bookmark.domain.split('.')
-    const domainName = domainParts.slice(0, -1).join('.')
-    const extension = bookmark.extension
-    
-    const response = await toggleBookmark(domainName, extension)
+    const response = await toggleBookmark(bookmark.domain, bookmark.extension)
     
     if (response?.requiresAuth) {
       setAuthDialogOpen(true)
     } else if (response?.success) {
       toast.success('Bookmark removed', {
-        description: `${bookmark.domain} has been removed from your bookmarks`,
+        description: `${bookmark.fullDomain} has been removed from your bookmarks`,
         duration: 3000,
       })
     }
   }, [toggleBookmark])
 
   const checkAvailability = useCallback(async (bookmark: BookmarkedDomain) => {
-    const domainKey = bookmark.domain
+    const domainKey = bookmark.fullDomain
     if (checkingAvailability.has(domainKey)) return
 
     setCheckingAvailability(prev => new Set(prev).add(domainKey))
@@ -127,16 +123,14 @@ export function BookmarksDisplay({ className }: BookmarksDisplayProps) {
           'Content-Type': 'application/json',
           'x-session-id': sessionId || ''
         },
-        body: JSON.stringify({ domain: bookmark.domain }),
+        body: JSON.stringify({ domain: bookmark.fullDomain }),
       })
       
       const data = await response.json()
       
       if (response.ok && data.results?.[0]) {
         const result = data.results[0]
-        // Update the bookmark's availability status
-        // Note: In a real implementation, you'd want to update this in state
-        toast.info(`${bookmark.domain} is ${result.available ? 'available' : 'taken'}`, {
+        toast.info(`${bookmark.fullDomain} is ${result.available ? 'available' : 'taken'}`, {
           duration: 3000,
         })
       }
@@ -278,7 +272,7 @@ export function BookmarksDisplay({ className }: BookmarksDisplayProps) {
       
       <AnimatePresence>
         {bookmarkedDomains.map((bookmark, index) => {
-          const isChecking = checkingAvailability.has(bookmark.domain)
+          const isChecking = checkingAvailability.has(bookmark.fullDomain)
           
           return (
             <motion.div
@@ -319,7 +313,7 @@ export function BookmarksDisplay({ className }: BookmarksDisplayProps) {
                 <div className="flex flex-col gap-1">
                   <div className="flex items-center gap-2">
                     <span className="text-lg font-medium text-foreground truncate">
-                      {bookmark.domain}
+                      {bookmark.fullDomain}
                     </span>
                     {bookmark.isPremium && (
                       <span className="px-2 py-1 text-xs font-medium bg-amber-100 text-amber-800 rounded-full border border-amber-200">
@@ -342,19 +336,19 @@ export function BookmarksDisplay({ className }: BookmarksDisplayProps) {
                   <motion.button
                     onClick={() => handleRemoveBookmark(bookmark)}
                     className="p-3 sm:p-2.5 text-red-500 hover:bg-red-50 active:bg-red-100 rounded-lg transition-colors touch-manipulation"
-                    aria-label={`Remove ${bookmark.domain} from bookmarks`}
+                    aria-label={`Remove ${bookmark.fullDomain} from bookmarks`}
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
                   >
                     <Trash2 className="h-4 w-4" />
                   </motion.button>
                   <motion.a
-                    href={`https://www.namecheap.com/domains/registration/results/?domain=${bookmark.domain}`}
+                    href={`https://www.namecheap.com/domains/registration/results/?domain=${bookmark.fullDomain}`}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="p-3 sm:p-2.5 text-[#9F7BE7] hover:bg-purple-50 active:bg-purple-100 rounded-lg transition-colors touch-manipulation"
-                    aria-label={`Register ${bookmark.domain}`}
-                    onClick={() => trackClick(bookmark.domain)}
+                    aria-label={`Register ${bookmark.fullDomain}`}
+                    onClick={() => trackClick(bookmark.fullDomain)}
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
                   >

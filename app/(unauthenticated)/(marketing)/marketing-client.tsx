@@ -1,6 +1,5 @@
 'use client'
 
-import { DomainSearch } from '@/components/domain-search/domain-search'
 import { DomainSearchWithTabs } from '@/components/domain-search/domain-search-with-tabs'
 import { motion, AnimatePresence } from 'framer-motion'
 import { ThemeToggle } from '@/components/theme-toggle'
@@ -131,23 +130,13 @@ function MarketingContent() {
             damping: 30
           }}
         >
-          {user && !authLoading ? (
-            <DomainSearchWithTabs 
-              className="mb-16" 
-              onQueryChange={handleQueryChange} 
-              onResultsChange={handleResultsChange}
-              initialQuery={initialQuery}
-              initialMode={initialMode || undefined}
-            />
-          ) : (
-            <DomainSearch 
-              className="mb-16" 
-              onQueryChange={handleQueryChange} 
-              onResultsChange={handleResultsChange}
-              initialQuery={initialQuery}
-              initialMode={initialMode || undefined}
-            />
-          )}
+          <DomainSearchWithTabs 
+            className="mb-16" 
+            onQueryChange={handleQueryChange} 
+            onResultsChange={handleResultsChange}
+            initialQuery={initialQuery}
+            initialMode={initialMode || undefined}
+          />
         </motion.div>
         
           </div>

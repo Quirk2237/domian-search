@@ -41,10 +41,15 @@ export function useBookmarks() {
         .eq("user_id", user.id)
         .order("created_at", { ascending: false })
 
-      if (error) throw error
+      if (error) {
+        console.error("Error fetching bookmarks:", error)
+        throw error
+      }
+      
       setBookmarks(data || [])
     } catch (error) {
       console.error("Error fetching bookmarks:", error)
+      setBookmarks([]) // Clear bookmarks on error
     } finally {
       setLoading(false)
     }
@@ -53,8 +58,10 @@ export function useBookmarks() {
   // Check if a domain is bookmarked
   const isBookmarked = useCallback(
     (domain: string, extension: string) => {
+      // Normalize extension - remove dot if present
+      const normalizedExtension = extension.startsWith('.') ? extension : `.${extension}`
       return bookmarks.some(
-        (b) => b.domain === domain && b.extension === extension
+        (b) => b.domain === domain && b.extension === normalizedExtension
       )
     },
     [bookmarks]
@@ -69,13 +76,15 @@ export function useBookmarks() {
         return { requiresAuth: true }
       }
 
+      // Normalize extension to always include dot for database storage
+      const normalizedExtension = extension.startsWith('.') ? extension : `.${extension}`
       const isCurrentlyBookmarked = isBookmarked(domain, extension)
 
       try {
         if (isCurrentlyBookmarked) {
           // Remove bookmark
           const bookmarkToRemove = bookmarks.find(
-            (b) => b.domain === domain && b.extension === extension
+            (b) => b.domain === domain && b.extension === normalizedExtension
           )
           
           if (bookmarkToRemove) {
@@ -90,11 +99,11 @@ export function useBookmarks() {
             if (error) throw error
           }
         } else {
-          // Add bookmark
+          // Add bookmark - always store extension with dot
           const newBookmark = {
             user_id: user.id,
             domain,
-            extension,
+            extension: normalizedExtension,
             search_id,
           }
 

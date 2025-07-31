@@ -7,11 +7,12 @@ import { CustomTabs } from './custom-tabs'
 import { DomainResults } from './domain-results'
 import { SuggestionResults } from './suggestion-results'
 import { EvaluationScore } from './evaluation-score'
-import { BookmarksDisplay } from './bookmarks-display'
+import { BookmarksTab } from './bookmarks-tab'
 import { Bookmark } from 'lucide-react'
 import { detectSearchMode } from '@/lib/domain-utils'
 import { cn } from '@/lib/utils'
 import { useSearchParams } from 'next/navigation'
+import { useAuth } from '@/hooks/use-auth'
 
 interface DomainSearchWithTabsProps {
   className?: string
@@ -58,6 +59,7 @@ function DomainSearchWithTabsInner({
   const abortControllerRef = useRef<AbortController | null>(null)
   const searchParams = useSearchParams()
   const isInitialLoad = useRef(true)
+  const { user, loading: authLoading } = useAuth()
 
   // Initialize session ID on mount
   useEffect(() => {
@@ -217,8 +219,9 @@ function DomainSearchWithTabsInner({
 
 
   const hasResults = domainResults.length > 0 || suggestionResults.length > 0
-  const showTabs = true  // Always show tabs when component is rendered (user is logged in)
-  const showTabContent = activeTab === 'bookmarks' || (activeTab === 'search' && query.trim() !== '' && hasResults && !error && !isLoading)
+  const showTabs = user && !authLoading  // Only show tabs when user is logged in
+  // Simplified: always show content when tabs are shown and activeTab is bookmarks, or when search has results
+  const showTabContent = showTabs && (activeTab === 'bookmarks' || (activeTab === 'search' && query.trim() !== '' && hasResults && !error && !isLoading))
 
   return (
     <div className={cn('w-full max-w-2xl mx-auto', className)}>
@@ -312,84 +315,128 @@ function DomainSearchWithTabsInner({
         )}
       </AnimatePresence>
 
-      {/* Tab content with results */}
-      <AnimatePresence mode="wait">
-        {showTabContent && (
-          <motion.div
-            className="mt-6"
-            initial={{ opacity: 0, y: 20, height: 0 }}
-            animate={{ opacity: 1, y: 0, height: "auto" }}
-            exit={{ opacity: 0, y: -20, height: 0 }}
-            transition={{ 
-              duration: 0.4,
-              type: "spring",
-              stiffness: 100,
-              damping: 15
-            }}
-          >
-            <AnimatePresence mode="wait">
-              {activeTab === 'search' && (
-                <motion.div
-                  key="search-content"
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -10 }}
-                  transition={{ duration: 0.3 }}
-                >
-                  <AnimatePresence mode="wait">
-                    {searchMode === 'domain' && domainResults.length > 0 && activeTab === 'search' && (
-                      <motion.div
-                        key="domain-results"
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -20 }}
-                        transition={{ 
-                          duration: 0.3,
-                          type: "spring",
-                          stiffness: 100,
-                          damping: 15
-                        }}
-                      >
-                        <DomainResults results={domainResults} searchQuery={query.trim()} />
-                      </motion.div>
-                    )}
-                    {searchMode === 'suggestion' && suggestionResults.length > 0 && activeTab === 'search' && (
-                      <motion.div
-                        key="suggestion-results"
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -20 }}
-                        transition={{ 
-                          duration: 0.3,
-                          type: "spring",
-                          stiffness: 100,
-                          damping: 15
-                        }}
-                        className="space-y-4"
-                      >
-                        <SuggestionResults results={suggestionResults} searchQuery={query.trim()} />
-                        <EvaluationScore searchId={currentSearchId} className="mt-6 pt-6 border-t" />
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                </motion.div>
-              )}
+      {/* Tab content with results for logged-in users */}
+      {showTabs && (
+        <AnimatePresence mode="wait">
+          {showTabContent && (
+            <motion.div
+              className="mt-6"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              transition={{ 
+                duration: 0.4,
+                type: "spring",
+                stiffness: 100,
+                damping: 15
+              }}
+            >
+              <AnimatePresence mode="wait">
+                {activeTab === 'search' && (
+                  <motion.div
+                    key="search-content"
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -10 }}
+                    transition={{ duration: 0.3 }}
+                  >
+                    <AnimatePresence mode="wait">
+                      {searchMode === 'domain' && domainResults.length > 0 && (
+                        <motion.div
+                          key="domain-results"
+                          initial={{ opacity: 0, y: 20 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, y: -20 }}
+                          transition={{ 
+                            duration: 0.3,
+                            type: "spring",
+                            stiffness: 100,
+                            damping: 15
+                          }}
+                        >
+                          <DomainResults results={domainResults} searchQuery={query.trim()} />
+                        </motion.div>
+                      )}
+                      {searchMode === 'suggestion' && suggestionResults.length > 0 && (
+                        <motion.div
+                          key="suggestion-results"
+                          initial={{ opacity: 0, y: 20 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, y: -20 }}
+                          transition={{ 
+                            duration: 0.3,
+                            type: "spring",
+                            stiffness: 100,
+                            damping: 15
+                          }}
+                          className="space-y-4"
+                        >
+                          <SuggestionResults results={suggestionResults} searchQuery={query.trim()} />
+                          <EvaluationScore searchId={currentSearchId} className="mt-6 pt-6 border-t" />
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </motion.div>
+                )}
 
-              {activeTab === 'bookmarks' && (
-                <motion.div
-                  key="bookmarks-content"
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -10 }}
-                  transition={{ duration: 0.3 }}
-                >
-                  <BookmarksDisplay />
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </motion.div>
-        )}
-      </AnimatePresence>
+                {activeTab === 'bookmarks' && (
+                  <motion.div
+                    key="bookmarks-content"
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -10 }}
+                    transition={{ duration: 0.3 }}
+                  >
+                    <BookmarksTab />
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      )}
+
+      {/* Regular results for non-logged-in users */}
+      {!showTabs && (
+        <AnimatePresence mode="wait">
+          {!error && query.trim() && !isLoading && (domainResults.length > 0 || suggestionResults.length > 0) && (
+            <motion.div 
+              className="mt-6"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.3 }}
+            >
+              <AnimatePresence mode="wait">
+                {searchMode === 'domain' && domainResults.length > 0 && (
+                  <motion.div
+                    key="domain-results"
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -20 }}
+                    transition={{ duration: 0.3 }}
+                  >
+                    <DomainResults results={domainResults} searchQuery={query.trim()} />
+                  </motion.div>
+                )}
+                {searchMode === 'suggestion' && suggestionResults.length > 0 && (
+                  <motion.div
+                    key="suggestion-results"
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -20 }}
+                    transition={{ duration: 0.3 }}
+                    className="space-y-4"
+                  >
+                    <SuggestionResults results={suggestionResults} searchQuery={query.trim()} />
+                    <EvaluationScore searchId={currentSearchId} className="mt-6 pt-6 border-t" />
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      )}
     </div>
   )
 }
