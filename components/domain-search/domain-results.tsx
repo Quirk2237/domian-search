@@ -197,13 +197,13 @@ export function DomainResults({ results, searchQuery }: DomainResultsProps) {
                     href={`https://www.namecheap.com/domains/registration/results/?domain=${result.domain}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="p-3 sm:p-2.5 text-blue-600 hover:bg-blue-50 active:bg-blue-100 rounded-lg transition-colors touch-manipulation"
+                    className="p-3 sm:p-2.5 text-[#9F7BE7] hover:text-[#9F7BE7]/80 rounded-lg transition-colors touch-manipulation"
                     aria-label={`Register ${result.domain}`}
                     onClick={() => trackClick(result.domain)}
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
                   >
-                    <ExternalLink className="h-5 w-5" />
+                    <ExternalLink className="h-4 w-4" />
                   </motion.a>
                 </div>
               </>

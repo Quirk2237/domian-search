@@ -7,7 +7,7 @@ if (!stripeSecretKey) {
 }
 
 export const stripe = new Stripe(stripeSecretKey, {
-  apiVersion: "2025-05-28.basil",
+  apiVersion: "2025-07-30.basil",
   appInfo: {
     name: "Wicked Simple Domains",
     version: "0.1.0"

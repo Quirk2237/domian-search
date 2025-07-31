@@ -215,16 +215,10 @@ function DomainSearchWithTabsInner({
     }
   }, [domainResults, suggestionResults, onResultsChange])
 
-  // Auto-switch to search tab when new results come in
-  useEffect(() => {
-    if ((domainResults.length > 0 || suggestionResults.length > 0) && activeTab === 'bookmarks') {
-      setActiveTab('search')
-    }
-  }, [domainResults.length, suggestionResults.length, activeTab])
 
   const hasResults = domainResults.length > 0 || suggestionResults.length > 0
   const showTabs = true  // Always show tabs when component is rendered (user is logged in)
-  const showTabContent = query.trim() !== '' && hasResults && !error && !isLoading
+  const showTabContent = activeTab === 'bookmarks' || (activeTab === 'search' && query.trim() !== '' && hasResults && !error && !isLoading)
 
   return (
     <div className={cn('w-full max-w-2xl mx-auto', className)}>
@@ -343,7 +337,7 @@ function DomainSearchWithTabsInner({
                   transition={{ duration: 0.3 }}
                 >
                   <AnimatePresence mode="wait">
-                    {searchMode === 'domain' && domainResults.length > 0 && (
+                    {searchMode === 'domain' && domainResults.length > 0 && activeTab === 'search' && (
                       <motion.div
                         key="domain-results"
                         initial={{ opacity: 0, y: 20 }}
@@ -359,7 +353,7 @@ function DomainSearchWithTabsInner({
                         <DomainResults results={domainResults} searchQuery={query.trim()} />
                       </motion.div>
                     )}
-                    {searchMode === 'suggestion' && suggestionResults.length > 0 && (
+                    {searchMode === 'suggestion' && suggestionResults.length > 0 && activeTab === 'search' && (
                       <motion.div
                         key="suggestion-results"
                         initial={{ opacity: 0, y: 20 }}
@@ -384,36 +378,12 @@ function DomainSearchWithTabsInner({
               {activeTab === 'bookmarks' && (
                 <motion.div
                   key="bookmarks-content"
-                  className="text-center py-16 text-muted-foreground"
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -10 }}
                   transition={{ duration: 0.3 }}
                 >
-                  <motion.div
-                    initial={{ scale: 0.8, opacity: 0 }}
-                    animate={{ scale: 1, opacity: 1 }}
-                    transition={{ delay: 0.1, duration: 0.3 }}
-                    className="space-y-4"
-                  >
-                    <Bookmark className="h-16 w-16 mx-auto opacity-20" />
-                    <div className="space-y-2">
-                      <h3 className="text-xl font-semibold text-foreground">Bookmarks Coming Soon</h3>
-                      <p className="text-muted-foreground max-w-md mx-auto leading-relaxed">
-                        Save your favorite domains and keep track of the ones you want to register later.
-                      </p>
-                    </div>
-                    <motion.div
-                      className="pt-4"
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      transition={{ delay: 0.3, duration: 0.3 }}
-                    >
-                      <div className="text-sm text-muted-foreground/60">
-                        This feature is currently in development
-                      </div>
-                    </motion.div>
-                  </motion.div>
+                  <BookmarksDisplay />
                 </motion.div>
               )}
             </AnimatePresence>

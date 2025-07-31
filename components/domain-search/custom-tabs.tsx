@@ -46,7 +46,8 @@ export function CustomTabs({ activeTab, onTabChange, className }: CustomTabsProp
             <Icon 
               className={cn(
                 "h-3.5 w-3.5",
-                isActive && "fill-[#9F7BE7] text-[#9F7BE7]"
+                isActive && tab.id === 'search' && "fill-[#9F7BE7] text-[#9F7BE7]",
+                isActive && tab.id === 'bookmarks' && "fill-yellow-400 text-yellow-500"
               )} 
             />
 
